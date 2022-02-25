@@ -324,7 +324,14 @@ void BrowseToFile(LPCTSTR path, LPCTSTR pathNfilename)
     ILFree(folder);
 }
 
+/*
+        This code is from Textify
 
+        https://github.com/m417z/Textify
+
+        TextDlg.cpp
+        CTextDlg::OnInitDialog
+*/
 //this extracts the text from the control that is currently under the mouse pointer (cursor)
 void GetAccessibleInfoFromPoint(POINT pt, CWindow& window, CString& outString, CRect& outRc, std::vector<int>& outIndexes)
 {
@@ -526,7 +533,11 @@ void controlProperties()
 
 /* --------------------------------------------------------------------------- 
 
+
+
             THE MAIN FUNCTION CONTROL CENTRE
+
+
 
 ------------------------------------------------------------------------------ */
 //custom cbtproc
