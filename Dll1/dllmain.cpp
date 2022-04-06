@@ -563,7 +563,7 @@ LRESULT CALLBACK CBTProcedure(int nCode, WPARAM wParam, LPARAM lParam)
     }
 
     //capture keyboard input
-    if (pMsg->message == WM_CHAR)
+    if (pMsg->message == WM_KEYUP)
     {
         //use ESC key to turn POIs on/off
         if (pMsg->wParam == VK_ESCAPE)
