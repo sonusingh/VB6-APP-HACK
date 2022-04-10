@@ -20,18 +20,12 @@
 HINSTANCE hinst;
 #pragma data_seg(".shared")
 HHOOK g_hHook;
+HHOOK cbt_hHook;
 #pragma data_seg()
 
 //since we are using MFC when linking it will complain of DLLMAIN
 //already being linked from MFC so use this to tell the linker to use our DLLMAIN
 extern "C" { int _afxForceUSRDLL; }
-
-//handle to the app that is to be injected into
-HWND targetWnd = FindWindow("ThunderRT6FormDC", "Select Track Section");
-//child of main window
-HWND tabs = FindWindowExA(targetWnd, NULL, "SSTabCtlWndClass", NULL);
-//chile of control
-HWND flexGridHWND = FindWindowExA(tabs, NULL, "MSFlexGridWndClass", NULL);
 
 // Function pointer to the original (un-detoured) Text APIs
 int (WINAPI* Real_DrawText)
@@ -76,7 +70,7 @@ std::string HWNDToString(HWND input)
 }
 
 //write output to text file
-void WriteToFile(HDC hDC, std::string text)//, std::string handle = "NO_HANDLE", std::string fnName = "NO_FUNCTION_NAME") 
+void WriteToFile(std::string text, HDC hDC = nullptr)
 {
     /*
     //this will get the parent window (control) where the text is being written
@@ -92,7 +86,7 @@ void WriteToFile(HDC hDC, std::string text)//, std::string handle = "NO_HANDLE",
 
     //output to text file
     std::ofstream outfile;
-    outfile.open("C:\\Users\\Public\\Documents\\kms.txt", std::fstream::trunc); // truncate mode
+    outfile.open("C:\\Users\\Public\\Documents\\kms.txt", std::ios_base::app); // ,std::fstream::trunc -> truncate mode ,std::ios_base::app -> append mode
     //outfile << mainWindowName << " -> " << windowName << " -> " << text << "\n";
     outfile << text << "\n";
     outfile.close();
@@ -115,6 +109,21 @@ std::string convertToStr(LPCSTR str) {
     return std::string(str);
 }
 
+
+//get real parent window of control
+HWND GetRealParent(HWND hWnd)
+{
+    HWND hWndOwner;
+
+    // To obtain a window's owner window, instead of using GetParent,
+    // use GetWindow with the GW_OWNER flag.
+
+    if (NULL != (hWndOwner = GetWindow(hWnd, GW_OWNER)))
+        return hWndOwner;
+
+    // Obtain the parent window and not the owner
+    return GetAncestor(hWnd, GA_PARENT);
+}
 
 
 //open menu
@@ -197,7 +206,7 @@ BOOL WINAPI Mine_TextOut(__in HDC hdc,__in int nXStart,__in int nYStart,__in LPC
         //showMessageBox(HWNDToString(hWindow).c_str(), "Window");
         //showMessageBox(lpString, "TextOut");
         std::string stext = convertToStr(lpString);
-        WriteToFile(hdc, stext);
+        WriteToFile(stext, hdc);
         
         //here we check to see if POIs are turned off
         //if they are then show KMS in red colour
@@ -296,7 +305,6 @@ unsigned long getID() {
         while (inFile >> x) {
             sum = sum + x;
         }
-
         inFile.close();
     }
 
@@ -531,6 +539,192 @@ void controlProperties()
     
 }
 
+//set default font for all child controls in window
+bool CALLBACK SetFont(HWND child, LPARAM font) {
+    SendMessage(child, WM_SETFONT, font, true);
+    return true;
+}
+
+//global window display control
+bool windowCreated = false;
+HWND windowHandle;
+
+//control IDs for checkboxes
+#define srs2t1 	1500
+#define srs3t3 	1502
+#define srs3t5 	1504
+
+
+LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_COMMAND:
+    {
+        switch (LOWORD(wParam)) // *** Tells us which control ID sent a message ***
+        {
+        case srs2t1: // *** user clicked box 1 ***
+        {
+            if (SendMessage(GetDlgItem(hwnd, srs2t1), BM_GETCHECK, 0, 0) == BST_CHECKED)
+                showMessageBox("1","1");
+        } break;
+        case srs3t3:
+        {
+            if (SendMessage(GetDlgItem(hwnd, srs3t3), BM_GETCHECK, 0, 0) == BST_CHECKED)
+                showMessageBox("2", "2");
+        } break;
+        case srs3t5:
+        {
+            if (SendMessage(GetDlgItem(hwnd, srs3t5), BM_GETCHECK, 0, 0) == BST_CHECKED)
+                //showMessageBox("3", "3");
+                //ShowWindow(windowHandle, SW_HIDE);
+                DestroyWindow(hwnd);
+        } break;
+        }
+    }
+    break;
+    case WM_CHAR: //this is just for a program exit besides window's borders/task bar
+        
+        /*
+        if (wParam == VK_ESCAPE)
+        {
+            DestroyWindow(hwnd);
+        }
+        */
+    case WM_CLOSE:
+        DestroyWindow(hwnd);
+    case WM_DESTROY:
+        windowCreated = false;
+        PostQuitMessage(0);
+        return 0;
+    default:
+        return DefWindowProc(hwnd, message, wParam, lParam);
+    }
+    return 0;
+}
+
+//this is the window that allows user to enter a defect id and search SAP
+//also look up t/o, diamond etc
+int WINAPI showDefectWindow()
+{
+    //since the window has already been created
+    //just show it and exit
+    if (windowCreated) {
+        ShowWindow(windowHandle, SW_SHOW);
+        return 0;
+    }
+    //start creating the GUI window
+    WNDCLASS windowClass = {};
+    windowClass.hbrBackground = GetSysColorBrush(COLOR_3DFACE);//(HBRUSH)GetStockObject(COLOR_WINDOW + 1);
+    windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+    windowClass.hInstance = hinst;
+    windowClass.lpfnWndProc = WndProc;
+    windowClass.lpszClassName = "AIMS-PROCESSOR";
+    windowClass.style = CS_HREDRAW | CS_VREDRAW;
+
+    if (!RegisterClass(&windowClass)) {
+        MessageBox(NULL, "Could not register class", "Error", MB_OK);
+    }
+
+    //create the main window
+    windowHandle = CreateWindow("AIMS-PROCESSOR",
+        "SAP Defect/Equipment Finder",
+        WS_SYSMENU | WS_CAPTION,
+        0, 0, 500, 300,
+        NULL, NULL, NULL, NULL);
+    
+    //disable close button
+    EnableMenuItem(GetSystemMenu(windowHandle, FALSE), SC_CLOSE,
+        MF_BYCOMMAND | MF_DISABLED | MF_GRAYED);
+
+    CreateWindow("BUTTON", "South Run", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
+        5,            /* X Position */
+        5,            /* Y Position */
+        480,           /* X Width */
+        250,           /* Y Height */
+        windowHandle, NULL, NULL, NULL);
+
+    //create checkbox
+    HWND SouthS2T1 = CreateWindowEx(WS_EX_TRANSPARENT, "BUTTON", "Session 2 SR - Main Up 10104",
+        WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+        20, 20, 460, 15,
+        windowHandle, NULL, NULL, NULL);
+    HWND SouthS3T3 = CreateWindowEx(WS_EX_TRANSPARENT, "BUTTON", "Session 3 SR - Illawarra Dive Down 10140",
+        WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+        20, 35, 460, 15,
+        windowHandle, NULL, NULL, NULL);
+    HWND SouthS3T5 = CreateWindowEx(WS_EX_TRANSPARENT, "BUTTON", "Session 3 SR - Illawarra Down Main 1 10113",
+        WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+        20, 50, 460, 15,
+        windowHandle, NULL, NULL, NULL);
+
+    //give the control its ID
+    SetWindowLong(SouthS2T1, GWL_ID, srs2t1);
+    SetWindowLong(SouthS3T3, GWL_ID, srs3t3);
+    SetWindowLong(SouthS3T5, GWL_ID, srs3t5);
+
+    //for some reason the default font is very large and ugly
+    //so set the system default font with this
+    EnumChildWindows(windowHandle, (WNDENUMPROC)SetFont, (LPARAM)GetStockObject(DEFAULT_GUI_FONT));
+
+    //show window
+    ShowWindow(windowHandle, SW_RESTORE);
+
+    //set windowcreated to true
+    windowCreated = true;
+
+    MSG messages;
+    while (GetMessage(&messages, NULL, 0, 0) > 0)
+    {
+        TranslateMessage(&messages);
+        DispatchMessage(&messages);
+    }
+    DeleteObject(windowHandle); //doing it just in case
+    return messages.wParam;
+}
+
+//show the track selection window as we want it to be
+void resizeTrackSelectionWindow()
+{
+    HWND trackSelectionWindow = FindWindow("ThunderRT6FormDC", "Select Track Section");
+    if (trackSelectionWindow) {
+
+        // get controls on window
+        HWND cancelBtn = FindWindowExA(trackSelectionWindow, NULL, "ThunderRT6CommandButton", "&Cancel");
+        HWND backBtn = FindWindowExA(trackSelectionWindow, NULL, "ThunderRT6CommandButton", "<< &Back");
+        HWND browseBtn = FindWindowExA(trackSelectionWindow, NULL, "ThunderRT6CommandButton", "Browse &Archive");
+        HWND selectBtn = FindWindowExA(trackSelectionWindow, NULL, "ThunderRT6CommandButton", "&Select");
+        HWND importExceedences = FindWindowExA(trackSelectionWindow, NULL, "ThunderRT6CommandButton", "Import Exceedances");
+        HWND tabs = FindWindowExA(trackSelectionWindow, NULL, "SSTabCtlWndClass", NULL);
+        // note control is child of sub-control
+        HWND checkBox = FindWindowExA(tabs, NULL, "ThunderRT6CheckBox", NULL);
+        HWND flexGrid = FindWindowExA(tabs, NULL, "MSFlexGridWndClass", NULL);
+        // size for the tabbed area and msflexgrid
+        int width = 640;
+        int height = 1250;
+
+        // set size of main window
+        SetWindowPos(trackSelectionWindow, 0, 200, 90, 1342, 1300, SWP_SHOWWINDOW);
+
+        // hide unneeded controls
+        ShowWindow(cancelBtn, 1);
+        ShowWindow(checkBox, 0);
+        ShowWindow(backBtn, 0);
+        ShowWindow(browseBtn, 0);
+
+        // resize controls
+        SetWindowPos(tabs, 0, 680, 10, width, height, SWP_SHOWWINDOW);
+        SetWindowPos(flexGrid, 0, 0, 0, width, height, SWP_SHOWWINDOW);
+        SetWindowPos(selectBtn, 0, 4, 323, 657, 33, SWP_SHOWWINDOW);
+
+        SetWindowPos(cancelBtn, 0, 4, 575, 657, 683, SWP_SHOWWINDOW);
+        SendMessage(cancelBtn, WM_SETTEXT, 0, (LPARAM)"Singh Moded\n\n2022");
+        EnableWindow(cancelBtn, 0);
+
+        UpdateWindow(trackSelectionWindow);
+    }
+}
+
 /* --------------------------------------------------------------------------- 
 
 
@@ -540,8 +734,8 @@ void controlProperties()
 
 
 ------------------------------------------------------------------------------ */
-//custom cbtproc
-LRESULT CALLBACK CBTProcedure(int nCode, WPARAM wParam, LPARAM lParam)
+//custom GetMessageProcedure
+LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
     if (nCode < 0)
     {
@@ -561,6 +755,44 @@ LRESULT CALLBACK CBTProcedure(int nCode, WPARAM wParam, LPARAM lParam)
         controlProperties();
         return CallNextHookEx(NULL, nCode, wParam, lParam);
     }
+    
+    //destroy the SAP lookup window
+    //otherwise AIMS won't close properly (it will remain working in task manager CTRL+ALT+DEL)
+    //if (nCode == WM_CLOSE) {
+        //if (windowCreated) {
+            //showMessageBox("closing", "s");
+            //DestroyWindow(windowHandle);
+            //return CallNextHookEx(NULL, nCode, wParam, lParam);
+        //}
+        //return CallNextHookEx(NULL, nCode, wParam, lParam);
+    //}
+    /*
+    //are we leaving AIMS / closing AIMS window
+    if (pMsg->message == WM_CLOSE)
+    {
+        if (MessageBox(pMsg->hwnd, "WM_CLOSE Really quit?", "Exit AIMS", MB_OKCANCEL) == IDOK)
+        {
+            //exit the SAP defect window if it were created
+            if (windowCreated) {
+                DestroyWindow(windowHandle);
+            }
+            //test what is being saved in PID.txt file
+            //auto ss = std::to_string(getID());
+            //MessageBox(pMsg->hwnd, ss.c_str(), "Process ID", MB_OK);
+
+            // exit the injector app
+            // see https://stackoverflow.com/a/1916668
+            const auto inj_app = OpenProcess(PROCESS_TERMINATE, false, getID());
+            TerminateProcess(inj_app, 1);
+            CloseHandle(inj_app);
+
+            //finally exit AIMS
+            DestroyWindow(pMsg->hwnd);
+        }
+        return 0;
+        return CallNextHookEx(NULL, nCode, wParam, lParam);
+    }
+    */
 
     //capture keyboard input
     if (pMsg->message == WM_KEYUP)
@@ -580,12 +812,32 @@ LRESULT CALLBACK CBTProcedure(int nCode, WPARAM wParam, LPARAM lParam)
                 selectMenuItem(aimsAPP, refreshMenu, (LPARAM)TEXT("Refresh"));
 
             }
+
+            return CallNextHookEx(NULL, nCode, wParam, lParam);
+        }
+
+        //show about aims window and add our custom defect lookup stuff
+        if (pMsg->wParam == VK_F9)
+        {
+            // are v reviewing?
+            HWND aimsAPP = FindWindow("ThunderRT6FormDC", "A.I.M.S  3.4.6 - Main");
+            if (aimsAPP)
+            {
+                showDefectWindow();
+            }
+
             return CallNextHookEx(NULL, nCode, wParam, lParam);
         }
 
         //get tracks processed from track selection window
         if (pMsg->wParam == '`')
         {
+            //handle to the app that is to be injected into
+            HWND targetWnd = FindWindow("ThunderRT6FormDC", "Select Track Section");
+            //child of main window
+            HWND tabs = FindWindowExA(targetWnd, NULL, "SSTabCtlWndClass", NULL);
+            //child of control
+            HWND flexGridHWND = FindWindowExA(tabs, NULL, "MSFlexGridWndClass", NULL);
 
             //check we have the track selection grid in focus
             ::GetClassName(pMsg->hwnd, szClassName, sizeof(szClassName) - 1);
@@ -662,22 +914,71 @@ LRESULT CALLBACK CBTProcedure(int nCode, WPARAM wParam, LPARAM lParam)
                 //and select/highlight the file named Get_Processed_Tracks
                 BrowseToFile("C:\\Users\\Public\\Documents\\", "C:\\Users\\Public\\Documents\\Get_Processed_Tracks.xlsm");
 
-                //test what is being saved in PID.txt file
-                //auto ss = std::to_string(getID());
-                //MessageBox(pMsg->hwnd, ss.c_str(), "Process ID", MB_OK);
-
-                // exit the injector app
-                // see https://stackoverflow.com/a/1916668
-                //const auto inj_app = OpenProcess(PROCESS_TERMINATE, false, getID());
-                //TerminateProcess(inj_app, 1);
-                //CloseHandle(inj_app);
-
                 return CallNextHookEx(NULL, nCode, wParam, lParam);
             }
             return CallNextHookEx(NULL, nCode, wParam, lParam);
         }
         return CallNextHookEx(NULL, nCode, wParam, lParam);
     }
+    return CallNextHookEx(NULL, nCode, wParam, lParam);
+}
+
+//check if resize window function has run
+bool windowResized = false;
+
+//custom CBTProc
+LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+    if (nCode < 0)
+    {
+        return CallNextHookEx(NULL, nCode, wParam, lParam);
+    }
+    
+    //when we the track selection window is ready 
+    //the cancel button is the last to be created 
+    //so check for it and its parent must be "select track section" window
+    if (nCode == HCBT_SETFOCUS)
+    {
+        HWND hwnd = (HWND)wParam;
+        if (!HWNDToString(hwnd).empty()) {
+            std::string parentWindow = HWNDToString(GetRealParent(hwnd));
+            std::string control = HWNDToString(hwnd);
+            //WriteToFile(control + parentWindow);
+
+            //check for it and resize the window to the way we want it to be
+            if (control.compare("&Cancel") == 0 && parentWindow.compare("Select Track Section") == 0) {
+                resizeTrackSelectionWindow();
+                windowResized = true;
+                return CallNextHookEx(NULL, nCode, wParam, lParam);
+            }
+            return CallNextHookEx(NULL, nCode, wParam, lParam);
+        }
+
+        //for some reason the resize of window works but
+        //it has to be done again otherwise the "select" button is not
+        //positioned correctly
+        if (windowResized) {
+            resizeTrackSelectionWindow();
+        }
+        return CallNextHookEx(NULL, nCode, wParam, lParam);
+    }
+    /*
+    if (nCode == HCBT_DESTROYWND)
+    {
+        HWND hwnd = (HWND)wParam;
+        if (!HWNDToString(hwnd).empty()) {
+            std::string parentWindow = " parent: " + HWNDToString(GetRealParent(hwnd));
+            std::string control = "child: " + HWNDToString(hwnd);
+            WriteToFile(control + parentWindow);
+            if (control.compare("AIMS_Office") == 0) {
+                if (windowCreated) {
+                    showMessageBox("closing", "s");
+                    DestroyWindow(windowHandle);
+                }
+            }
+        }
+    }
+    */
     return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 
@@ -722,10 +1023,12 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 extern "C" __declspec(dllexport) void install(unsigned long threadID, unsigned long injectorAppID) {
     //store the injector app's process id
     storeInjAppID(injectorAppID);
-    g_hHook = SetWindowsHookEx(WH_GETMESSAGE, (HOOKPROC)CBTProcedure, hinst, threadID);
+    g_hHook = SetWindowsHookEx(WH_GETMESSAGE, (HOOKPROC)GetMsgProc, hinst, threadID);
+    cbt_hHook = SetWindowsHookEx(WH_CBT, (HOOKPROC)CBTProc, hinst, threadID);
 }
 
 //called when the injector app is closed
 extern "C" __declspec(dllexport) void uninstall() {
     UnhookWindowsHookEx(g_hHook);
+    UnhookWindowsHookEx(cbt_hHook);
 }
