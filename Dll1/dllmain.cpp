@@ -7,6 +7,8 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include <Windows.h>
+#include "resource.h"
 
 //linker to detours.lib
 #pragma comment(lib, "detours.lib")
@@ -86,7 +88,7 @@ void WriteToFile(std::string text, HDC hDC = nullptr)
 
     //output to text file
     std::ofstream outfile;
-    outfile.open("C:\\Users\\Public\\Documents\\kms.txt", std::ios_base::app); // ,std::fstream::trunc -> truncate mode ,std::ios_base::app -> append mode
+    outfile.open("C:\\Users\\Public\\Documents\\kms.txt", std::fstream::trunc); // ,std::fstream::trunc -> truncate mode ,std::ios_base::app -> append mode
     //outfile << mainWindowName << " -> " << windowName << " -> " << text << "\n";
     outfile << text << "\n";
     outfile.close();
@@ -531,12 +533,8 @@ void controlProperties()
 
     //open the browser window with the SAP defect
     ShellExecute(NULL, "open", "https://ecc.transport.nsw.gov.au/sap/bc/gui/sap/its/webgui;~sysid=TPE;~service=3200?~transaction=*iw22 RIWO00-QMNUM=" + strText + ";OKCODE=SHOW", NULL, NULL, SW_SHOWNORMAL);
-    //"https://ecc.transport.nsw.gov.au/sap/bc/gui/sap/its/webgui;~sysid=TPE;~service=3200?~transaction=*iw22 RIWO00-QMNUM=" + notificationID.Text + ";OKCODE=SHOW"
-
     
     return;
-
-    
 }
 
 //set default font for all child controls in window
@@ -554,6 +552,75 @@ HWND windowHandle;
 #define srs3t3 	1502
 #define srs3t5 	1504
 
+//open the browser and load SAP iw29 or iw65 screen for the given start and finish KMs and the Basecode
+void open_iw29_iw65(HWND hwnd, CString screen) {
+    //declare
+    TCHAR start_km_text[128]; TCHAR end_km_text[128]; TCHAR basecode_text[128]; TCHAR defect_id[128];
+    //get text from edits on dialogbox
+    GetDlgItemText(hwnd, start_km, start_km_text, 128);GetDlgItemText(hwnd, end_km, end_km_text, 128);GetDlgItemText(hwnd, basecode, basecode_text, 128);
+    GetDlgItemText(hwnd, partial_defect_id, defect_id, 128);
+    
+    //need to conver to tchar to CString to use
+    //need to change project settings Character Set: Use multi-byte character set
+    //see https://stackoverflow.com/a/6006371
+    CString s_km_text = start_km_text;CString e_km_text = end_km_text;CString b_text = basecode_text;
+    CString d_id = defect_id;
+
+    if (screen == "iw29" || screen == "iw65"){
+        if (s_km_text.IsEmpty() || e_km_text.IsEmpty() || b_text.IsEmpty()) {
+            showMessageBox("Start, End and Basecode must be provided to list defects.", "Try Again...");
+            return;
+        }
+        //open the browser window with the SAP defects
+        ShellExecute(NULL, "open",
+            "https://ecc.transport.nsw.gov.au/sap/bc/gui/sap/its/webgui;~sysid=TPE;~service=3200?~transaction=*" + screen + " S_START - LOW = " + s_km_text + "; S_START - HIGH = " + e_km_text + "; S_LRPID - LOW = *" + b_text + "; OKCODE = SHOW",
+            NULL, NULL, SW_SHOWNORMAL);
+    }
+
+    if (screen == "iw29_srch_defect") {
+        if (d_id.IsEmpty()) {
+            showMessageBox("Please enter a defect ID or partial defect ID.", "Try Again...");
+            return;
+        }
+        ShellExecute(NULL, "open",
+            "https://ecc.transport.nsw.gov.au/sap/bc/gui/sap/its/webgui;~sysid=TPE;~service=3200?~transaction=*iw29 QMNUM - LOW = *" + d_id + "*; OKCODE = SHOW",
+            NULL, NULL, SW_SHOWNORMAL);
+    }
+}
+
+BOOL CALLBACK DialogProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
+{
+    switch (Message)
+    {
+    case WM_INITDIALOG:
+
+        return TRUE;
+    case WM_COMMAND:
+        switch (LOWORD(wParam))
+        {
+        case search_iw29:
+            open_iw29_iw65(hwnd, "iw29");
+            break;
+        case search_iw65:
+            open_iw29_iw65(hwnd, "iw65");
+            break;
+        case find_sap_defect:
+            open_iw29_iw65(hwnd, "iw29_srch_defect");
+            break;
+        case IDOK:
+            EndDialog(hwnd, IDOK);
+            break;
+        case IDCANCEL:
+            EndDialog(hwnd, IDCANCEL);
+            break;
+        }
+        break;
+    default:
+        return FALSE;
+    }
+    return TRUE;
+}
+
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -570,8 +637,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         } break;
         case srs3t3:
         {
-            if (SendMessage(GetDlgItem(hwnd, srs3t3), BM_GETCHECK, 0, 0) == BST_CHECKED)
-                showMessageBox("2", "2");
+            //if (SendMessage(GetDlgItem(hwnd, srs3t3), BM_GETCHECK, 0, 0) == BST_CHECKED)
+            DialogBox(hinst,MAKEINTRESOURCE(IDD_DIALOG1), hwnd, DialogProc);
         } break;
         case srs3t5:
         {
@@ -607,27 +674,40 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 //also look up t/o, diamond etc
 int WINAPI showDefectWindow()
 {
-    //since the window has already been created
+    DialogBox(hinst, MAKEINTRESOURCE(IDD_DIALOG1), 0, DialogProc);
+    return 0;
+    //check if review window open
+    HWND reviewWindow = FindWindow("ThunderRT6FormDC", "A.I.M.S  3.4.6 - Main");
+    if (!reviewWindow) {
+        return 0;
+    }
+
+    //if the window has already been created
     //just show it and exit
     if (windowCreated) {
         ShowWindow(windowHandle, SW_SHOW);
         return 0;
     }
     //start creating the GUI window
-    WNDCLASS windowClass = {};
-    windowClass.hbrBackground = GetSysColorBrush(COLOR_3DFACE);//(HBRUSH)GetStockObject(COLOR_WINDOW + 1);
-    windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
-    windowClass.hInstance = hinst;
-    windowClass.lpfnWndProc = WndProc;
-    windowClass.lpszClassName = "AIMS-PROCESSOR";
-    windowClass.style = CS_HREDRAW | CS_VREDRAW;
+    WNDCLASS windowClass{};
 
-    if (!RegisterClass(&windowClass)) {
-        MessageBox(NULL, "Could not register class", "Error", MB_OK);
+    //if the window was closed the class remains registered
+    //so check if class already exists or not
+    if (!GetClassInfo(hinst, "AIMS-SAP-HELPER", &windowClass))
+    {
+        windowClass.hbrBackground = GetSysColorBrush(COLOR_3DFACE);//(HBRUSH)GetStockObject(COLOR_WINDOW + 1);
+        windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+        windowClass.hInstance = hinst;
+        windowClass.lpfnWndProc = WndProc;
+        windowClass.lpszClassName = "AIMS-SAP-HELPER";
+        windowClass.style = CS_HREDRAW | CS_VREDRAW;
+        if (!RegisterClass(&windowClass)) {
+            MessageBox(NULL, "Could not register class", "Error", MB_OK);
+        }
     }
 
     //create the main window
-    windowHandle = CreateWindow("AIMS-PROCESSOR",
+    windowHandle = CreateWindow("AIMS-SAP-HELPER",
         "SAP Defect/Equipment Finder",
         WS_SYSMENU | WS_CAPTION,
         0, 0, 500, 300,
@@ -755,44 +835,6 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
         controlProperties();
         return CallNextHookEx(NULL, nCode, wParam, lParam);
     }
-    
-    //destroy the SAP lookup window
-    //otherwise AIMS won't close properly (it will remain working in task manager CTRL+ALT+DEL)
-    //if (nCode == WM_CLOSE) {
-        //if (windowCreated) {
-            //showMessageBox("closing", "s");
-            //DestroyWindow(windowHandle);
-            //return CallNextHookEx(NULL, nCode, wParam, lParam);
-        //}
-        //return CallNextHookEx(NULL, nCode, wParam, lParam);
-    //}
-    /*
-    //are we leaving AIMS / closing AIMS window
-    if (pMsg->message == WM_CLOSE)
-    {
-        if (MessageBox(pMsg->hwnd, "WM_CLOSE Really quit?", "Exit AIMS", MB_OKCANCEL) == IDOK)
-        {
-            //exit the SAP defect window if it were created
-            if (windowCreated) {
-                DestroyWindow(windowHandle);
-            }
-            //test what is being saved in PID.txt file
-            //auto ss = std::to_string(getID());
-            //MessageBox(pMsg->hwnd, ss.c_str(), "Process ID", MB_OK);
-
-            // exit the injector app
-            // see https://stackoverflow.com/a/1916668
-            const auto inj_app = OpenProcess(PROCESS_TERMINATE, false, getID());
-            TerminateProcess(inj_app, 1);
-            CloseHandle(inj_app);
-
-            //finally exit AIMS
-            DestroyWindow(pMsg->hwnd);
-        }
-        return 0;
-        return CallNextHookEx(NULL, nCode, wParam, lParam);
-    }
-    */
 
     //capture keyboard input
     if (pMsg->message == WM_KEYUP)
@@ -830,10 +872,14 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
         }
 
         //get tracks processed from track selection window
-        if (pMsg->wParam == '`')
+        // VK_OEM_3 = ` and ~
+        if (pMsg->wParam == VK_OEM_3)
         {
-            //handle to the app that is to be injected into
+            //if no track selection window open - exit
             HWND targetWnd = FindWindow("ThunderRT6FormDC", "Select Track Section");
+            if (!targetWnd) {
+                return 0;
+            }
             //child of main window
             HWND tabs = FindWindowExA(targetWnd, NULL, "SSTabCtlWndClass", NULL);
             //child of control
@@ -908,6 +954,19 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
                     "Source code @ sukhpalsingh OneDrive",
                     "Data Copy Finished",
                     MB_OK);
+                
+                
+                //USE THIS CODE TO CLOSE THE injecting APP
+                //test what is being saved in PID.txt file
+                //auto ss = std::to_string(getID());
+                //MessageBox(pMsg->hwnd, ss.c_str(), "Process ID", MB_OK);
+
+                // exit the injector app
+                // see https://stackoverflow.com/a/1916668
+                const auto inj_app = OpenProcess(PROCESS_TERMINATE, false, getID());
+                TerminateProcess(inj_app, 1);
+                CloseHandle(inj_app);
+
                 */
 
                 //open the folder containing the xls/csv file
@@ -962,10 +1021,27 @@ LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
         }
         return CallNextHookEx(NULL, nCode, wParam, lParam);
     }
-    /*
+
     if (nCode == HCBT_DESTROYWND)
     {
-        HWND hwnd = (HWND)wParam;
+        /*
+        HWND hTemp = (HWND)wParam;
+        DWORD id;
+
+        if (hTemp != NULL)
+        {
+            //MessageBox(GetDesktopWindow(), "hTemp e NULL", "a", MB_OK);
+            id = GetWindowThreadProcessId(hTemp, NULL);
+            if (id != NULL)
+            {
+                auto sid = std::to_string(id);
+                //MessageBox(GetDesktopWindow(), "idu e 0", "a", MB_OK);
+                WriteToFile(sid);
+            }
+        }
+        */
+
+        /*
         if (!HWNDToString(hwnd).empty()) {
             std::string parentWindow = " parent: " + HWNDToString(GetRealParent(hwnd));
             std::string control = "child: " + HWNDToString(hwnd);
@@ -977,8 +1053,9 @@ LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
                 }
             }
         }
+        */
     }
-    */
+
     return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 

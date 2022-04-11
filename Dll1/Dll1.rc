@@ -1,0 +1,146 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "winres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// English (United States) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_DIALOG1 DIALOGEX 10, 10, 353, 311
+STYLE DS_SETFONT | DS_MODALFRAME | DS_3DLOOK | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "SAP Helper Functions"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Close",IDOK,299,292,50,14
+    GROUPBOX        "List Defects",IDC_STATIC,6,6,342,66
+    LTEXT           "Start KM:",IDC_STATIC,14,20,32,8
+    LTEXT           "End KM:",IDC_STATIC,15,39,28,8
+    LTEXT           "Basecode:",IDC_STATIC,15,56,35,8
+    EDITTEXT        start_km,66,18,40,14,ES_AUTOHSCROLL
+    EDITTEXT        end_km,66,36,40,14,ES_AUTOHSCROLL
+    EDITTEXT        basecode,66,54,40,14,ES_AUTOHSCROLL | ES_NUMBER
+    PUSHBUTTON      "Search IW29",search_iw29,132,18,50,14
+    PUSHBUTTON      "Search IW65",search_iw65,192,18,50,14
+    GROUPBOX        "Find SAP Defect",IDC_STATIC,6,78,342,54
+    LTEXT           "Partial Defect ID:",IDC_STATIC,12,96,60,8
+    EDITTEXT        partial_defect_id,78,94,60,14,ES_AUTOHSCROLL | ES_NUMBER
+    CONTROL         "Search closed Defects (will take longer)",search_closed_checkbox,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,144,96,156,10
+    PUSHBUTTON      "Find/View SAP Defect",find_sap_defect,12,114,126,14
+    GROUPBOX        "Find Turnout",IDC_STATIC,6,180,342,108
+    GROUPBOX        "View Defects for Turnout",IDC_STATIC,6,136,342,38
+    LTEXT           "Turnout Functional Location:",IDC_STATIC,12,153,96,8
+    EDITTEXT        turnout_functional_location,112,150,92,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "Show Defects for T/O",show_defects_for_turnout,216,150,126,14
+    LTEXT           "Turnout Type:",IDC_STATIC,12,198,96,8
+    LTEXT           "Territory:",IDC_STATIC,13,214,96,8
+    LTEXT           "KM:",IDC_STATIC,12,228,96,8
+    LTEXT           "Points ID:",IDC_STATIC,12,243,96,8
+    LTEXT           "Basecode:",IDC_STATIC,12,257,96,8
+    COMBOBOX        turnout_type_drop_down,114,195,138,30,CBS_DROPDOWN | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        territory_drop_down,114,210,139,30,CBS_DROPDOWN | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        turnout_km,114,224,40,14,ES_AUTOHSCROLL
+    EDITTEXT        points_id,114,240,40,14,ES_AUTOHSCROLL
+    EDITTEXT        turnout_basecode,114,255,40,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "Find Turnout",find_turnout_btn,10,272,242,14
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_DIALOG1, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 346
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 304
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// AFX_DIALOG_LAYOUT
+//
+
+IDD_DIALOG1 AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
+#endif    // English (United States) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////
+// English (Australia) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENA)
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_AUS
+#pragma code_page(1252)
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""winres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+#endif    // English (Australia) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+
