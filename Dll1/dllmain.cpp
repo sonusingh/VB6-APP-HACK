@@ -959,6 +959,12 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
             HWND aimsAPP = FindWindow("ThunderRT6FormDC", "A.I.M.S  3.4.6 - Main");
             if (aimsAPP)
             {
+                //when review window is hidden and if we press escape key it will crash AIMS
+                if (!IsWindowVisible(aimsAPP)) {
+                    showMessageBox("not visible","no no");
+                    return 0;
+                }
+
                 HMENU fileMenu = findMenu(GetMenu(aimsAPP), (LPARAM)TEXT("View"));
                 selectMenuItem(aimsAPP, fileMenu, (LPARAM)TEXT("POI Markers"));
                 Sleep(100);
