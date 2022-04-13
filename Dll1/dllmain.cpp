@@ -544,10 +544,12 @@ bool CALLBACK SetFont(HWND child, LPARAM font) {
 }
 
 //global window display control
+//these are reuqired if creating a pop window manually
 bool windowCreated = false;
 HWND windowHandle;
 
 //control IDs for checkboxes
+//these for manually created controls
 #define srs2t1 	1500
 #define srs3t3 	1502
 #define srs3t5 	1504
@@ -555,17 +557,24 @@ HWND windowHandle;
 //open the browser and load SAP iw29 or iw65 screen for the given start and finish KMs and the Basecode
 void open_iw29_iw65(HWND hwnd, CString screen) {
     //declare
-    TCHAR start_km_text[128]; TCHAR end_km_text[128]; TCHAR basecode_text[128]; TCHAR defect_id[128];
+    TCHAR start_km_text[128], end_km_text[128], basecode_text[128], defect_id[128], turnout_location[128];
+    TCHAR turnout_type[128], territory[128], tout_kms[128], tout_points_id[128], tout_basecode[128];
+
     //get text from edits on dialogbox
     GetDlgItemText(hwnd, start_km, start_km_text, 128);GetDlgItemText(hwnd, end_km, end_km_text, 128);GetDlgItemText(hwnd, basecode, basecode_text, 128);
-    GetDlgItemText(hwnd, partial_defect_id, defect_id, 128);
-    
+    GetDlgItemText(hwnd, partial_defect_id, defect_id, 128); GetDlgItemText(hwnd, turnout_functional_location, turnout_location, 128);
+    GetDlgItemText(hwnd, turnout_type_drop_down, turnout_type, 128); GetDlgItemText(hwnd, territory_drop_down, territory, 128);
+    GetDlgItemText(hwnd, turnout_km, tout_kms, 128); GetDlgItemText(hwnd, points_id, tout_points_id, 128);
+    GetDlgItemText(hwnd, turnout_basecode, tout_basecode, 128);
+
     //need to conver to tchar to CString to use
     //need to change project settings Character Set: Use multi-byte character set
     //see https://stackoverflow.com/a/6006371
-    CString s_km_text = start_km_text;CString e_km_text = end_km_text;CString b_text = basecode_text;
-    CString d_id = defect_id;
+    CString s_km_text = start_km_text, e_km_text = end_km_text, b_text = basecode_text;
+    CString d_id = defect_id, tout_loc = turnout_location;
+    CString tout_type = turnout_type, tout_territory = territory, tout_km = tout_kms, tout_pnt_id = tout_points_id, tout_bcode = tout_basecode;
 
+    //presses the get list of defects for given KMs and basecode either for iw29 or iw65
     if (screen == "iw29" || screen == "iw65"){
         if (s_km_text.IsEmpty() || e_km_text.IsEmpty() || b_text.IsEmpty()) {
             showMessageBox("Start, End and Basecode must be provided to list defects.", "Try Again...");
@@ -573,27 +582,124 @@ void open_iw29_iw65(HWND hwnd, CString screen) {
         }
         //open the browser window with the SAP defects
         ShellExecute(NULL, "open",
-            "https://ecc.transport.nsw.gov.au/sap/bc/gui/sap/its/webgui;~sysid=TPE;~service=3200?~transaction=*" + screen + " S_START - LOW = " + s_km_text + "; S_START - HIGH = " + e_km_text + "; S_LRPID - LOW = *" + b_text + "; OKCODE = SHOW",
+            "https://ecc.transport.nsw.gov.au/sap/bc/gui/sap/its/webgui;~sysid=TPE;~service=3200?~transaction=*" + screen + " S_START-LOW=" + s_km_text + ";S_START-HIGH=" + e_km_text + ";S_LRPID-LOW=*" + b_text + ";OKCODE=SHOW#",
             NULL, NULL, SW_SHOWNORMAL);
     }
 
+    //search for a SAP defect using defect id/partial defect ID
     if (screen == "iw29_srch_defect") {
         if (d_id.IsEmpty()) {
             showMessageBox("Please enter a defect ID or partial defect ID.", "Try Again...");
             return;
         }
+        //search iw65 (closed defects as well?)
+        if (!IsDlgButtonChecked(hwnd, search_closed_checkbox)) {
+            ShellExecute(NULL, "open",
+                "https://ecc.transport.nsw.gov.au/sap/bc/gui/sap/its/webgui;~sysid=TPE;~service=3200?~transaction=*iw29 QMNUM-LOW=*" + d_id + "*;S_LRPID-LOW=*;OKCODE=SHOW#",
+                NULL, NULL, SW_SHOWNORMAL);
+        }
+        else {
+            ShellExecute(NULL, "open",
+                "https://ecc.transport.nsw.gov.au/sap/bc/gui/sap/its/webgui;~sysid=TPE;~service=3200?~transaction=*iw65 QMNUM-LOW=*" + d_id + "*;S_LRPID-LOW=*;OKCODE=SHOW#",
+                NULL, NULL, SW_SHOWNORMAL);
+        }
+    }
+
+    //the user wants to edit sap defect in iw22
+    if (screen == "iw22_edit") {
+        //make sure defect id is at least 10 digits long
+        //e.g. 1001225236
+        if (int(d_id.GetLength()) < 10) {
+            showMessageBox("Please enter complete SAP defect ID", "Try Again...");
+            return;
+        }
+        else {
+            ShellExecute(NULL, "open",
+                "https://ecc.transport.nsw.gov.au/sap/bc/gui/sap/its/webgui;~sysid=TPE;~service=3200?~transaction=*iw22 RIWO00-QMNUM=" + d_id + ";OKCODE=SHOW#",
+                NULL, NULL, SW_SHOWNORMAL);
+        }
+    }
+
+    //list defects for a given turnout
+    if (screen == "view_defects_for_turnout") {
+        if (tout_loc.IsEmpty()) {
+            showMessageBox("Please enter the turnout functional location (usually starts with T-TOUT)", "Try Again...");
+            return;
+        }
         ShellExecute(NULL, "open",
-            "https://ecc.transport.nsw.gov.au/sap/bc/gui/sap/its/webgui;~sysid=TPE;~service=3200?~transaction=*iw29 QMNUM - LOW = *" + d_id + "*; OKCODE = SHOW",
+            "https://ecc.transport.nsw.gov.au/sap/bc/gui/sap/its/webgui;~sysid=TPE;~service=3200?~transaction=*iw29 STRNO-LOW=" + tout_loc + ";OKCODE=SHOW#",
+            NULL, NULL, SW_SHOWNORMAL);
+    }
+
+    //search for a search for a turnout/diamond etc
+    if (screen == "find_turnout") {
+        //declarations
+        CString Territory_code, StartKM, EndKM;
+        
+        //we need at least the points no. or KMs and Basecode
+        if (tout_km.IsEmpty() && tout_pnt_id.IsEmpty() && tout_bcode.IsEmpty()) {
+            showMessageBox("Please enter the basecode and KMs or just the points number to look for a turnout.", "Try Again...");
+            return;
+        }
+        //if kms provided add and subtract 0.075 KMs
+        if (!tout_km.IsEmpty()) {
+            double startKMs = atof(tout_km) - 0.075;
+            double endKMs   = atof(tout_km) + 0.075;
+
+            StartKM.Format("%g", startKMs);
+            EndKM.Format("%g", endKMs);
+        }
+        else {
+            StartKM, EndKM = tout_kms;
+        }
+
+        //get the territory code
+        Territory_code = tout_territory.Right(tout_territory.GetLength() - (tout_territory.Find('-') + 1));
+
+        ShellExecute(NULL, "open",
+            "https://ecc.transport.nsw.gov.au/sap/bc/gui/sap/its/webgui;~sysid=TPE;~service=3200?~transaction=*ih06 STRNO-LOW=" + tout_type + ";S_START-LOW=" + StartKM + ";S_START-HIGH=" + EndKM + ";S_UOM=ZNK;S_LRPID-LOW=*" + tout_bcode + "*;PLTXT-LOW=*" + tout_pnt_id + "*;GEWRK-LOW=" + Territory_code + ";OKCODE=SHOW#",
             NULL, NULL, SW_SHOWNORMAL);
     }
 }
 
+//the dialog from the resource file has a dialog proc to handle events
 BOOL CALLBACK DialogProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 {
+    //need to manually add items to the drop downs
+    HWND t_out, territories = NULL;
+    const char* t_out_list[] = { "*T-TOUT*", "*T-DIA*","*T-CPNT*", "*" };
+    const char* territory_list[] = { "ALL -*", 
+        "Blacktown -NWSCVT1",
+        "CBD -NCECVT1", 
+        "Clyde -NCWCVT1",
+        "Glenfield -NSWCVT1",
+        "Gosford -NCCCVT1",
+        "Hamilton -NCCCVT2",
+        "Hornsby -NCNCVT1",
+        "Lawson -NWSCVT2",
+        "Sutherland -NCSCVT2",
+        "Sydenham -NCSCVT1",
+        "Wollongong -NSCCVT1"
+    };
+
     switch (Message)
     {
     case WM_INITDIALOG:
-
+        //add the data to the drop downs
+        //firstly turnout type
+        t_out = GetDlgItem(hwnd, turnout_type_drop_down);
+        for (int Count = 0; Count < 4; Count++)
+        {
+            SendMessage(t_out, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>((LPCTSTR)t_out_list[Count]));
+        }
+        SendMessage(t_out, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);
+        //and territories
+        territories = GetDlgItem(hwnd, territory_drop_down);
+        for (int Count = 0; Count < 12; Count++)
+        {
+            SendMessage(territories, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>((LPCTSTR)territory_list[Count]));
+        }
+        SendMessage(territories, CB_SETCURSEL, (WPARAM)0, (LPARAM)0);        
         return TRUE;
     case WM_COMMAND:
         switch (LOWORD(wParam))
@@ -606,12 +712,18 @@ BOOL CALLBACK DialogProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
             break;
         case find_sap_defect:
             open_iw29_iw65(hwnd, "iw29_srch_defect");
+            break; 
+        case edit_sap_defect:
+            open_iw29_iw65(hwnd, "iw22_edit");
+            break;
+        case show_defects_for_turnout:
+            open_iw29_iw65(hwnd, "view_defects_for_turnout");
+            break;
+        case find_turnout_btn:
+            open_iw29_iw65(hwnd, "find_turnout");
             break;
         case IDOK:
             EndDialog(hwnd, IDOK);
-            break;
-        case IDCANCEL:
-            EndDialog(hwnd, IDCANCEL);
             break;
         }
         break;
@@ -621,7 +733,12 @@ BOOL CALLBACK DialogProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
     return TRUE;
 }
 
+/*
 
+If we a create a window manually it needs its own wndproc to handle window events
+
+*/
+/*
 LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
@@ -651,13 +768,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
     }
     break;
     case WM_CHAR: //this is just for a program exit besides window's borders/task bar
-        
-        /*
-        if (wParam == VK_ESCAPE)
-        {
-            DestroyWindow(hwnd);
-        }
-        */
+       //if (wParam == VK_ESCAPE)
+            //DestroyWindow(hwnd);
     case WM_CLOSE:
         DestroyWindow(hwnd);
     case WM_DESTROY:
@@ -669,13 +781,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
     }
     return 0;
 }
+*/
 
 //this is the window that allows user to enter a defect id and search SAP
 //also look up t/o, diamond etc
 int WINAPI showDefectWindow()
 {
+    //rather than creating a window manually just use the resource dialog box
     DialogBox(hinst, MAKEINTRESOURCE(IDD_DIALOG1), 0, DialogProc);
     return 0;
+
+    /* use the following code to create a window progmatically*/
+    /*
     //check if review window open
     HWND reviewWindow = FindWindow("ThunderRT6FormDC", "A.I.M.S  3.4.6 - Main");
     if (!reviewWindow) {
@@ -714,15 +831,10 @@ int WINAPI showDefectWindow()
         NULL, NULL, NULL, NULL);
     
     //disable close button
-    EnableMenuItem(GetSystemMenu(windowHandle, FALSE), SC_CLOSE,
-        MF_BYCOMMAND | MF_DISABLED | MF_GRAYED);
+    EnableMenuItem(GetSystemMenu(windowHandle, FALSE), SC_CLOSE, MF_BYCOMMAND | MF_DISABLED | MF_GRAYED);
 
-    CreateWindow("BUTTON", "South Run", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
-        5,            /* X Position */
-        5,            /* Y Position */
-        480,           /* X Width */
-        250,           /* Y Height */
-        windowHandle, NULL, NULL, NULL);
+    //group box
+    CreateWindow("BUTTON", "South Run", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,5,5,480,250,windowHandle, NULL, NULL, NULL);
 
     //create checkbox
     HWND SouthS2T1 = CreateWindowEx(WS_EX_TRANSPARENT, "BUTTON", "Session 2 SR - Main Up 10104",
@@ -761,6 +873,7 @@ int WINAPI showDefectWindow()
     }
     DeleteObject(windowHandle); //doing it just in case
     return messages.wParam;
+    */
 }
 
 //show the track selection window as we want it to be

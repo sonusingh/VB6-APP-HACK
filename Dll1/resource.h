@@ -18,16 +18,17 @@
 #define turnout_km                      1015
 #define points_id                       1016
 #define turnout_basecode                1017
-#define IDC_BUTTON5                     1018
 #define find_turnout_btn                1018
+#define edit_sap_defect                 1019
+#define IDC_COMBOBOXEX2                 1023
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        104
+#define _APS_NEXT_RESOURCE_VALUE        105
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1014
+#define _APS_NEXT_CONTROL_VALUE         1024
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
