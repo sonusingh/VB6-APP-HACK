@@ -961,7 +961,6 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
             {
                 //when review window is hidden and if we press escape key it will crash AIMS
                 if (!IsWindowVisible(aimsAPP)) {
-                    showMessageBox("not visible","no no");
                     return 0;
                 }
 
