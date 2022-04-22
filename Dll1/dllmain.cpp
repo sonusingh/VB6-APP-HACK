@@ -470,9 +470,6 @@ void GetAccessibleInfoFromPoint(POINT pt, CWindow& window, CString& outString, C
     }
 }
 
-
-
-
 //enable edit box and open/close in POI Detail window
 //and if EAM defects window open and user double click on EAM ID open
 //browser with SAP defect ID
@@ -918,6 +915,177 @@ void resizeTrackSelectionWindow()
     }
 }
 
+//get processed tracks method
+void getProcessedTracks(HWND targetWnd, bool sort = false) {
+    //class name placeholder
+    char szClassName[128];
+    memset(szClassName, 0, sizeof(szClassName));
+
+    //child of main window
+    HWND tabs = FindWindowExA(targetWnd, NULL, "SSTabCtlWndClass", NULL);
+    //child of control
+    HWND flexGridHWND = FindWindowExA(tabs, NULL, "MSFlexGridWndClass", NULL);
+
+    //if the flexgrid is not found - exit
+    if (!tabs && !flexGridHWND) {
+        return;
+    }
+
+    //check we have the track selection grid in focus
+    ::GetClassName(flexGridHWND, szClassName, sizeof(szClassName) - 1);
+    if (strcmp(szClassName, "MSFlexGridWndClass") == 0)
+    {
+        DWORD* p = (DWORD*) ::GetWindowLong(flexGridHWND, GWL_USERDATA);
+        p++; //add 8;
+        p++; //add 8;
+        LPDISPATCH pDisp = (LPDISPATCH)*p;
+        long row, col;
+
+        //ole control driver
+        COleDispatchDriver iDriver;
+
+        //release on exit
+        iDriver.m_bAutoRelease = TRUE;
+        
+        //attach to pointer
+        iDriver.AttachDispatch(pDisp);
+
+        // getrows()
+        iDriver.InvokeHelper(0x4, DISPATCH_PROPERTYGET, VT_I4, (void*)&row, NULL);
+        // getcols() 
+        iDriver.InvokeHelper(0x5, DISPATCH_PROPERTYGET, VT_I4, (void*)&col, NULL);
+
+
+        /*
+        //set the font size
+        static BYTE parmst[] = VTS_R4;
+        iDriver.InvokeHelper(0x4e, DISPATCH_PROPERTYPUT, VT_EMPTY, NULL, parmst, 200);
+        
+        //set font width
+        static BYTE parmsC[] = VTS_R4;
+        iDriver.InvokeHelper(0x54, DISPATCH_PROPERTYPUT, VT_EMPTY, NULL, parmsC, 200);
+
+        //refresh
+        iDriver.InvokeHelper(DISPID_REFRESH, DISPATCH_METHOD, VT_EMPTY, NULL, NULL);
+
+        //CRowCursor 
+        LPDISPATCH pDispatch;
+        iDriver.InvokeHelper(0x4c, DISPATCH_PROPERTYGET, VT_DISPATCH, (void*)&pDispatch, NULL);
+        
+        
+        //output to csv file
+        std::ofstream Toutfile;
+        Toutfile.open("C:\\Users\\Public\\Documents\\xtra.txt", std::ios_base::app); // append
+        Toutfile << pDispatch << "\n";
+        Toutfile.close();
+        */
+
+        //GetMouseCol
+        //used this to get col no.
+        //long mouseCol;
+        //iDriver.InvokeHelper(0x1c, DISPATCH_PROPERTYGET, VT_I4, (void*)&mouseCol, NULL);
+        
+        //std::string test = std::to_string(mouseCol);
+
+        //Section = 0, Session = 1, Capture Date = 2, Track ID = 3 ... etc
+        //col no. 3 is the track ID col
+        //showMessageBox(test.c_str(), "col");
+        
+        //this is called when the track selection window is displayed upon loading up
+        if (sort) {
+            static BYTE parmss[] = VTS_I4;
+            //setCol() select the column we want to sort
+            iDriver.InvokeHelper(0xb, DISPATCH_PROPERTYPUT, VT_EMPTY, NULL, parmss, 3);
+
+            static BYTE parmsss[] = VTS_I2;
+            //setSort() sort the column by Numeric Ascending
+            iDriver.InvokeHelper(0x2e, DISPATCH_PROPERTYPUT, VT_EMPTY, NULL, parmsss, 3);
+
+            //note the last param for setSort is a number based on:
+            /*
+            flexSortNone 0 flexSortGenericAscending 1 flexSortGenericDescending 2 flexSortNumericAscending 3
+            flexSortNumericDescending 4 flexSortStringNoCaseAsending 5 flexSortNoCaseDescending 6 flexSortStringAscending 7 flexSortStringDescending 8
+            flexSortCustom 9
+            */
+
+            //release driver
+            iDriver.DetachDispatch();
+            iDriver.ReleaseDispatch();
+            //delete iDriver;
+            iDriver = NULL;
+
+            //delete p, pDisp;
+            p, pDisp = NULL;
+
+            //only wanted to sort the grid - exit
+            return;
+        }
+
+        //store the returned text in the given row & col
+        CString result;
+        static BYTE parms[] = VTS_I4;
+
+        //declare data dir var
+        TCHAR appData[MAX_PATH];
+
+        //save to c drive
+        strcpy_s(appData, "C:\\Users\\Public\\Documents");
+
+        //output to csv file
+        std::ofstream outfile;
+        outfile.open(strcat(appData, "\\processed_tracks.csv"), std::fstream::trunc); // truncate file (ie clear contents)
+        //MessageBox(NULL, appData, "Output File", MB_OK);
+        //outfile << text << "\n";
+
+        //loop through the rows
+        for (int i = 0; i < row; i++) {
+            //if first row don't insert new line
+            if (i == 0) {
+                //do nothing
+            }
+            else {
+                outfile << "\n";
+            }
+            //loop throught he columns
+            for (int j = 0; j < col; j++)
+            {
+                iDriver.InvokeHelper(0x37, DISPATCH_PROPERTYGET, VT_BSTR, (void*)&result, parms, col * i + j);
+                outfile << result << "\t";
+                //showMessageBox(result, "Data");
+            }
+        }
+
+        //release driver
+        iDriver.DetachDispatch();
+        iDriver.ReleaseDispatch();
+        //delete iDriver;
+        iDriver = NULL;
+
+        //delete p, pDisp;
+        p, pDisp = NULL;
+
+        //close the csv file
+        outfile.close();
+
+        /*
+        //USE THIS CODE TO CLOSE THE injecting APP
+        //test what is being saved in PID.txt file
+        //auto ss = std::to_string(getID());
+        //MessageBox(pMsg->hwnd, ss.c_str(), "Process ID", MB_OK);
+
+        // exit the injector app
+        // see https://stackoverflow.com/a/1916668
+        const auto inj_app = OpenProcess(PROCESS_TERMINATE, false, getID());
+        TerminateProcess(inj_app, 1);
+        CloseHandle(inj_app);
+
+        */
+
+        //open the folder containing the xls/csv file
+        //and select/highlight the file named Get_Processed_Tracks
+        BrowseToFile("C:\\Users\\Public\\Documents\\", "C:\\Users\\Public\\Documents\\Get_Processed_Tracks.xlsm");
+    }
+}
 /* --------------------------------------------------------------------------- 
 
 
@@ -938,14 +1106,22 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
     //message param
     PMSG pMsg = (PMSG)lParam;
 
-    //class name placeholder
-    char szClassName[128];
-    memset(szClassName, 0, sizeof(szClassName));
-
     //someone double click?
     if (pMsg->message == WM_LBUTTONDBLCLK)
     {
         controlProperties();
+        return CallNextHookEx(NULL, nCode, wParam, lParam);
+    }
+
+    //someone left click?
+    if (pMsg->message == WM_LBUTTONUP)
+    {
+        HWND targetWnd = FindWindow("ThunderRT6FormDC", "Select Track Section");
+        if (targetWnd && IsWindowVisible(targetWnd)) {
+            resizeTrackSelectionWindow();
+            //sort the tracks selection grid by track id
+            getProcessedTracks(targetWnd, true);
+        }
         return CallNextHookEx(NULL, nCode, wParam, lParam);
     }
 
@@ -963,7 +1139,7 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
                 if (!IsWindowVisible(aimsAPP)) {
                     return 0;
                 }
-
+                //Select View->POI Markers
                 HMENU fileMenu = findMenu(GetMenu(aimsAPP), (LPARAM)TEXT("View"));
                 selectMenuItem(aimsAPP, fileMenu, (LPARAM)TEXT("POI Markers"));
                 Sleep(100);
@@ -998,101 +1174,22 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
             if (!targetWnd) {
                 return 0;
             }
-            //child of main window
-            HWND tabs = FindWindowExA(targetWnd, NULL, "SSTabCtlWndClass", NULL);
-            //child of control
-            HWND flexGridHWND = FindWindowExA(tabs, NULL, "MSFlexGridWndClass", NULL);
+            //call the get processed tracks method to export track list to csv
+            getProcessedTracks(targetWnd);
 
-            //check we have the track selection grid in focus
-            ::GetClassName(pMsg->hwnd, szClassName, sizeof(szClassName) - 1);
-            if (strcmp(szClassName, "MSFlexGridWndClass") == 0)
-            {
-                DWORD* p = (DWORD*) ::GetWindowLong(flexGridHWND, GWL_USERDATA);
-                p++; //add 8;
-                p++; //add 8;
-                LPDISPATCH pDisp = (LPDISPATCH)*p;
-                long row, col;
-                COleDispatchDriver iDriver;
-                iDriver.m_bAutoRelease = TRUE;
-
-                iDriver.AttachDispatch(pDisp);
-                // getrows() 
-                iDriver.InvokeHelper(0x4, DISPATCH_PROPERTYGET, VT_I4, (void*)&row, NULL);
-                // getcols() 
-                iDriver.InvokeHelper(0x5, DISPATCH_PROPERTYGET, VT_I4, (void*)&col, NULL);
-                CString result;
-                static BYTE parms[] = VTS_I4;
-
-                //declare data dir var
-                TCHAR appData[MAX_PATH];
-
-                //save to c drive
-                strcpy_s(appData, "C:\\Users\\Public\\Documents");
-
-                //output to csv file
-                std::ofstream outfile;
-                outfile.open(strcat(appData, "\\processed_tracks.csv"), std::fstream::trunc); // truncate file (ie clear contents)
-                //MessageBox(NULL, appData, "Output File", MB_OK);
-                //outfile << text << "\n";
-
-                //loop through the rows
-                for (int i = 0; i < row; i++) {
-                    //if first row don't insert new line
-                    if (i == 0) {
-                        //do nothing
-                    }
-                    else {
-                        outfile << "\n";
-                    }
-                    //loop throught he columns
-                    for (int j = 0; j < col; j++)
-                    {
-                        iDriver.InvokeHelper(0x37, DISPATCH_PROPERTYGET, VT_BSTR, (void*)&result, parms, col * i + j);
-                        outfile << result << "\t";
-                        //showMessageBox(result, "Data");
-                    }
-                }
-
-                //release driver
-                iDriver.ReleaseDispatch();
-                delete iDriver;
-
-                //close the csv file
-                outfile.close();
-
-                //let the user know we are done
-                //it appears if the user clicks multiple times it crashes the app
-                //so let them do it once and exit
-                /*
-                MessageBox(pMsg->hwnd,
-                    "The data has been copied to C:\\Users\\Public\\Documents\\processed_tracks.csv\n"
-                    "Run the Get_Processed_Tracks.xlsm to load the tracks!\n\n"
-                    "The injected app will now exit!\n\n"
-                    "-------------------------------\n\n"
-                    "Source code @ sukhpalsingh OneDrive",
-                    "Data Copy Finished",
-                    MB_OK);
-                
-                
-                //USE THIS CODE TO CLOSE THE injecting APP
-                //test what is being saved in PID.txt file
-                //auto ss = std::to_string(getID());
-                //MessageBox(pMsg->hwnd, ss.c_str(), "Process ID", MB_OK);
-
-                // exit the injector app
-                // see https://stackoverflow.com/a/1916668
-                const auto inj_app = OpenProcess(PROCESS_TERMINATE, false, getID());
-                TerminateProcess(inj_app, 1);
-                CloseHandle(inj_app);
-
-                */
-
-                //open the folder containing the xls/csv file
-                //and select/highlight the file named Get_Processed_Tracks
-                BrowseToFile("C:\\Users\\Public\\Documents\\", "C:\\Users\\Public\\Documents\\Get_Processed_Tracks.xlsm");
-
-                return CallNextHookEx(NULL, nCode, wParam, lParam);
+            return CallNextHookEx(NULL, nCode, wParam, lParam);
+        }
+        //pressed the "s" key
+        if (pMsg->wParam == 0x53)
+        {
+            //if no track selection window open - exit
+            HWND targetWnd = FindWindow("ThunderRT6FormDC", "Select Track Section");
+            if (!targetWnd) {
+                return 0;
             }
+            //sort the tracks selection grid by track id
+            getProcessedTracks(targetWnd, true);
+
             return CallNextHookEx(NULL, nCode, wParam, lParam);
         }
         return CallNextHookEx(NULL, nCode, wParam, lParam);
@@ -1126,6 +1223,8 @@ LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
             if (control.compare("&Cancel") == 0 && parentWindow.compare("Select Track Section") == 0) {
                 resizeTrackSelectionWindow();
                 windowResized = true;
+                //sort the tracks selection grid by track id
+                getProcessedTracks(GetRealParent(hwnd), true);
                 return CallNextHookEx(NULL, nCode, wParam, lParam);
             }
             return CallNextHookEx(NULL, nCode, wParam, lParam);
