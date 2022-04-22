@@ -955,8 +955,7 @@ void getProcessedTracks(HWND targetWnd, bool sort = false) {
         // getcols() 
         iDriver.InvokeHelper(0x5, DISPATCH_PROPERTYGET, VT_I4, (void*)&col, NULL);
 
-
-        /*
+        /*none of the following work!
         //set the font size
         static BYTE parmst[] = VTS_R4;
         iDriver.InvokeHelper(0x4e, DISPATCH_PROPERTYPUT, VT_EMPTY, NULL, parmst, 200);
@@ -968,16 +967,16 @@ void getProcessedTracks(HWND targetWnd, bool sort = false) {
         //refresh
         iDriver.InvokeHelper(DISPID_REFRESH, DISPATCH_METHOD, VT_EMPTY, NULL, NULL);
 
-        //CRowCursor 
+        //get data source
         LPDISPATCH pDispatch;
         iDriver.InvokeHelper(0x4c, DISPATCH_PROPERTYGET, VT_DISPATCH, (void*)&pDispatch, NULL);
-        
-        
+                
         //output to csv file
         std::ofstream Toutfile;
         Toutfile.open("C:\\Users\\Public\\Documents\\xtra.txt", std::ios_base::app); // append
         Toutfile << pDispatch << "\n";
         Toutfile.close();
+        //END OF NOT WORKING SECTION
         */
 
         //GetMouseCol
