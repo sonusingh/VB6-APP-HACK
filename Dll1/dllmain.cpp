@@ -23,6 +23,7 @@ HINSTANCE hinst;
 #pragma data_seg(".shared")
 HHOOK g_hHook;
 HHOOK cbt_hHook;
+HHOOK WndProc_hHook;
 #pragma data_seg()
 
 //since we are using MFC when linking it will complain of DLLMAIN
@@ -879,6 +880,12 @@ void resizeTrackSelectionWindow()
     HWND trackSelectionWindow = FindWindow("ThunderRT6FormDC", "Select Track Section");
     if (trackSelectionWindow) {
 
+        //get current position
+        RECT rect;
+        GetWindowRect(trackSelectionWindow, &rect);
+        int x = rect.left;
+        int y = rect.top;
+
         // get controls on window
         HWND cancelBtn = FindWindowExA(trackSelectionWindow, NULL, "ThunderRT6CommandButton", "&Cancel");
         HWND backBtn = FindWindowExA(trackSelectionWindow, NULL, "ThunderRT6CommandButton", "<< &Back");
@@ -889,34 +896,61 @@ void resizeTrackSelectionWindow()
         // note control is child of sub-control
         HWND checkBox = FindWindowExA(tabs, NULL, "ThunderRT6CheckBox", NULL);
         HWND flexGrid = FindWindowExA(tabs, NULL, "MSFlexGridWndClass", NULL);
+
         // size for the tabbed area and msflexgrid
         int width = 640;
-        int height = 1250;
+        int height = 950;
 
         // set size of main window
-        SetWindowPos(trackSelectionWindow, 0, 200, 90, 1342, 1300, SWP_SHOWWINDOW);
+        SetWindowPos(trackSelectionWindow, 0, x, y, 1342, 1000, SWP_SHOWWINDOW);
 
         // hide unneeded controls
-        ShowWindow(cancelBtn, 1);
+        ShowWindow(cancelBtn, 0);
         ShowWindow(checkBox, 0);
         ShowWindow(backBtn, 0);
         ShowWindow(browseBtn, 0);
 
         // resize controls
+        SetWindowPos(selectBtn, 0, 4, 323, 657, 33, SWP_SHOWWINDOW);
         SetWindowPos(tabs, 0, 680, 10, width, height, SWP_SHOWWINDOW);
         SetWindowPos(flexGrid, 0, 0, 0, width, height, SWP_SHOWWINDOW);
         SetWindowPos(selectBtn, 0, 4, 323, 657, 33, SWP_SHOWWINDOW);
 
+        //if custom buttons not found create them
+        if (!FindWindowExA(trackSelectionWindow, NULL, "BUTTON", "Sort by Track ID")) {
+            //create the custom buttons
+            CreateWindowEx(WS_EX_CONTROLPARENT, "BUTTON", "Sort by Track ID",
+                WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                4, 360, 326, 33,
+                trackSelectionWindow, NULL, NULL, NULL);
+            CreateWindowEx(WS_EX_CONTROLPARENT, "BUTTON", "Sort by Sessions",
+                WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                330, 360, 331, 33,
+                trackSelectionWindow, NULL, NULL, NULL);
+            CreateWindowEx(WS_EX_CONTROLPARENT, "BUTTON", "Check Processed Tracks in Excel",
+                WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                4, 395, 326, 33,
+                trackSelectionWindow, NULL, NULL, NULL);
+            CreateWindowEx(WS_EX_CONTROLPARENT, "BUTTON", "Sort by Track Name",
+                WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                330, 395, 331, 33,
+                trackSelectionWindow, NULL, NULL, NULL);
+        }
+
+
+        /*
         SetWindowPos(cancelBtn, 0, 4, 575, 657, 683, SWP_SHOWWINDOW);
         SendMessage(cancelBtn, WM_SETTEXT, 0, (LPARAM)"Singh Moded\n\n2022");
         EnableWindow(cancelBtn, 0);
+        */
 
+        //update display
         UpdateWindow(trackSelectionWindow);
     }
 }
 
 //get processed tracks method
-void getProcessedTracks(HWND targetWnd, bool sort = false) {
+void getProcessedTracks(HWND targetWnd, int sort = 0) {
     //class name placeholder
     char szClassName[128];
     memset(szClassName, 0, sizeof(szClassName));
@@ -991,14 +1025,16 @@ void getProcessedTracks(HWND targetWnd, bool sort = false) {
         //showMessageBox(test.c_str(), "col");
         
         //this is called when the track selection window is displayed upon loading up
-        if (sort) {
+        if (sort > 0) {
             static BYTE parmss[] = VTS_I4;
             //setCol() select the column we want to sort
-            iDriver.InvokeHelper(0xb, DISPATCH_PROPERTYPUT, VT_EMPTY, NULL, parmss, 3);
+            iDriver.InvokeHelper(0xb, DISPATCH_PROPERTYPUT, VT_EMPTY, NULL, parmss, sort);
 
             static BYTE parmsss[] = VTS_I2;
             //setSort() sort the column by Numeric Ascending
-            iDriver.InvokeHelper(0x2e, DISPATCH_PROPERTYPUT, VT_EMPTY, NULL, parmsss, 3);
+            int s;
+            (sort == 4) ? s = 5 : s = 3;
+            iDriver.InvokeHelper(0x2e, DISPATCH_PROPERTYPUT, VT_EMPTY, NULL, parmsss, s);
 
             //note the last param for setSort is a number based on:
             /*
@@ -1115,13 +1151,41 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
     //someone left click?
     if (pMsg->message == WM_LBUTTONUP)
     {
+        //check if select track window open
         HWND targetWnd = FindWindow("ThunderRT6FormDC", "Select Track Section");
         if (targetWnd && IsWindowVisible(targetWnd)) {
             resizeTrackSelectionWindow();
-            //sort the tracks selection grid by track id
-            getProcessedTracks(targetWnd, true);
+            //local declarations
+            char szClassName[128];
+            memset(szClassName, 0, sizeof(szClassName));
+            char szText[128];
+            memset(szText, 0, sizeof(szText));
+
+            //get class of item the user clicked on
+            ::GetClassName(pMsg->hwnd, szClassName, sizeof(szClassName) - 1);
+
+            //check if it is a button
+            if (IsWindow(pMsg->hwnd) && (strcmp(szClassName, "Button") == 0)) {
+                GetWindowText(pMsg->hwnd, szText, sizeof(szText) - 1);
+                //check if it is the button we want
+                if (strcmp(szText, "Sort by Track ID") == 0) {
+                    //sort the tracks selection grid by track id
+                    getProcessedTracks(targetWnd, 3);
+                }
+                if (strcmp(szText, "Sort by Sessions") == 0) {
+                    //sort the tracks selection grid by SESSION number
+                    getProcessedTracks(targetWnd, 1);
+                }
+                if (strcmp(szText, "Check Processed Tracks in Excel") == 0) {
+                    //export track list to csv and open excel file
+                    getProcessedTracks(targetWnd);
+                }                
+                if (strcmp(szText, "Sort by Track Name") == 0) {
+                    //sort by track name
+                    getProcessedTracks(targetWnd, 4);
+                }
+            }
         }
-        return CallNextHookEx(NULL, nCode, wParam, lParam);
     }
 
     //capture keyboard input
@@ -1179,6 +1243,7 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
             return CallNextHookEx(NULL, nCode, wParam, lParam);
         }
         //pressed the "s" key
+        /*
         if (pMsg->wParam == 0x53)
         {
             //if no track selection window open - exit
@@ -1191,6 +1256,7 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
 
             return CallNextHookEx(NULL, nCode, wParam, lParam);
         }
+        */
         return CallNextHookEx(NULL, nCode, wParam, lParam);
     }
     return CallNextHookEx(NULL, nCode, wParam, lParam);
@@ -1198,6 +1264,39 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
 
 //check if resize window function has run
 bool windowResized = false;
+
+//custom WNDPROC NOT WORKING 100% properly
+/*
+LRESULT CALLBACK NuWndProc(int nCode, WPARAM wParam, LPARAM lParam) {
+    //message param
+    PMSG pMsg = (PMSG)lParam;
+
+    if (pMsg->message == BN_CLICKED)
+    {
+        if (pMsg->wParam == srs2t1)
+        {
+            showMessageBox("1", "1");
+        }
+    }
+
+    if (nCode == HC_ACTION) {
+        //lets extract the data
+        CWPSTRUCT* data = (CWPSTRUCT*)lParam;
+        if (data->message == WM_CLOSE) {
+            //lets get the name of the program closed
+            char name[260];
+            GetWindowModuleFileNameA(data->hwnd, name, 260);
+            //extract only the exe from the path
+            char* extract = (char*)((DWORD)name + lstrlenA(name) - 1);
+            while (*extract != '\\')
+                extract--;
+            extract++;
+            MessageBoxA(0, "A program has been closed", extract, 0);
+        }
+    }
+    return CallNextHookEx(NULL, nCode, wParam, lParam);
+}
+*/
 
 //custom CBTProc
 LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
@@ -1222,8 +1321,6 @@ LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
             if (control.compare("&Cancel") == 0 && parentWindow.compare("Select Track Section") == 0) {
                 resizeTrackSelectionWindow();
                 windowResized = true;
-                //sort the tracks selection grid by track id
-                getProcessedTracks(GetRealParent(hwnd), true);
                 return CallNextHookEx(NULL, nCode, wParam, lParam);
             }
             return CallNextHookEx(NULL, nCode, wParam, lParam);
@@ -1316,6 +1413,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 extern "C" __declspec(dllexport) void install(unsigned long threadID, unsigned long injectorAppID) {
     //store the injector app's process id
     storeInjAppID(injectorAppID);
+    //WndProc_hHook = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)NuWndProc, hinst, threadID);
     g_hHook = SetWindowsHookEx(WH_GETMESSAGE, (HOOKPROC)GetMsgProc, hinst, threadID);
     cbt_hHook = SetWindowsHookEx(WH_CBT, (HOOKPROC)CBTProc, hinst, threadID);
 }
@@ -1324,4 +1422,5 @@ extern "C" __declspec(dllexport) void install(unsigned long threadID, unsigned l
 extern "C" __declspec(dllexport) void uninstall() {
     UnhookWindowsHookEx(g_hHook);
     UnhookWindowsHookEx(cbt_hHook);
+    UnhookWindowsHookEx(WndProc_hHook);
 }
