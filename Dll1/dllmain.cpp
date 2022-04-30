@@ -552,6 +552,22 @@ HWND windowHandle;
 #define srs3t3 	1502
 #define srs3t5 	1504
 
+
+//just for the fun of it add an image to the track selection window
+void LoadScreen(HWND hWnd) {
+    HBITMAP hBitmap = (HBITMAP)LoadImage(NULL, "C:\\Users\\ssingh1\\Downloads\\MinGW\\code\\fatherson.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+    SendMessage(hWnd, STM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)hBitmap);
+    /*
+    RECT rect;
+    HDC hdc = GetDC(hWnd);
+    HBRUSH brush = CreatePatternBrush((HBITMAP)LoadImage(NULL, "C:\\Users\\ssingh1\\Downloads\\MinGW\\code\\fatherson.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE));
+    GetWindowRect(hWnd, &rect);
+    FillRect(hdc, &rect, brush);
+    DeleteObject(brush);
+    ReleaseDC(hWnd, hdc);
+    */
+}
+
 //open the browser and load SAP iw29 or iw65 screen for the given start and finish KMs and the Basecode
 void open_iw29_iw65(HWND hwnd, CString screen) {
     //declare
@@ -911,10 +927,15 @@ void resizeTrackSelectionWindow()
         ShowWindow(browseBtn, 0);
 
         // resize controls
-        SetWindowPos(selectBtn, 0, 4, 323, 657, 33, SWP_SHOWWINDOW);
         SetWindowPos(tabs, 0, 680, 10, width, height, SWP_SHOWWINDOW);
         SetWindowPos(flexGrid, 0, 0, 0, width, height, SWP_SHOWWINDOW);
         SetWindowPos(selectBtn, 0, 4, 323, 657, 33, SWP_SHOWWINDOW);
+
+        //reload the image everytime
+        if (FindWindowExA(trackSelectionWindow, NULL, "STATIC", NULL)) {
+            //load the image 
+            LoadScreen(FindWindowExA(trackSelectionWindow, NULL, "STATIC", NULL));
+        }
 
         //if custom buttons not found create them
         if (!FindWindowExA(trackSelectionWindow, NULL, "BUTTON", "Sort by Track ID")) {
@@ -935,6 +956,12 @@ void resizeTrackSelectionWindow()
                 WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
                 330, 395, 331, 33,
                 trackSelectionWindow, NULL, NULL, NULL);
+            HWND staticControl = CreateWindowEx(WS_EX_DLGMODALFRAME, "STATIC", NULL,
+                WS_VISIBLE | WS_CHILD | SS_BITMAP,
+                73, 476, 504, 438,
+                trackSelectionWindow, NULL, NULL, NULL);
+            //load the image 
+            LoadScreen(staticControl);
         }
 
 
@@ -1177,8 +1204,9 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
                     getProcessedTracks(targetWnd, 1);
                 }
                 if (strcmp(szText, "Check Processed Tracks in Excel") == 0) {
+                    ShellExecute(NULL, NULL, "C:\\Users\\Public\\Documents\\Get_Processed_Tracks.xlsm", NULL, "C:\\Users\\Public\\Documents", SW_SHOWDEFAULT);
                     //export track list to csv and open excel file
-                    getProcessedTracks(targetWnd);
+                    //getProcessedTracks(targetWnd);
                 }                
                 if (strcmp(szText, "Sort by Track Name") == 0) {
                     //sort by track name
@@ -1230,6 +1258,7 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
 
         //get tracks processed from track selection window
         // VK_OEM_3 = ` and ~
+        /*
         if (pMsg->wParam == VK_OEM_3)
         {
             //if no track selection window open - exit
@@ -1243,7 +1272,6 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
             return CallNextHookEx(NULL, nCode, wParam, lParam);
         }
         //pressed the "s" key
-        /*
         if (pMsg->wParam == 0x53)
         {
             //if no track selection window open - exit
