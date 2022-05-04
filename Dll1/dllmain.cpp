@@ -9,6 +9,7 @@
 #include <vector>
 #include <Windows.h>
 #include "resource.h"
+using namespace std;
 
 //linker to detours.lib
 #pragma comment(lib, "detours.lib")
@@ -555,17 +556,23 @@ HWND windowHandle;
 
 //just for the fun of it add an image to the track selection window
 void LoadScreen(HWND hWnd) {
-    HBITMAP hBitmap = (HBITMAP)LoadImage(NULL, "C:\\Users\\ssingh1\\Downloads\\MinGW\\code\\fatherson.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
-    SendMessage(hWnd, STM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)hBitmap);
+    //to load bmp from file
+    //HBITMAP hBitmap = (HBITMAP)LoadImage(NULL, "C:\\Users\\ssingh1\\Downloads\\MinGW\\code\\fatherson.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+    
+    //load from resouce
+    HBITMAP hBitmap = (HBITMAP)LoadImage(hinst, MAKEINTRESOURCE(IDB_BITMAP1), IMAGE_BITMAP, 0, 0, LR_DEFAULTSIZE);
     /*
-    RECT rect;
-    HDC hdc = GetDC(hWnd);
-    HBRUSH brush = CreatePatternBrush((HBITMAP)LoadImage(NULL, "C:\\Users\\ssingh1\\Downloads\\MinGW\\code\\fatherson.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE));
-    GetWindowRect(hWnd, &rect);
-    FillRect(hdc, &rect, brush);
-    DeleteObject(brush);
-    ReleaseDC(hWnd, hdc);
+    DWORD error;
+    if (!hBitmap)
+    {
+        error = GetLastError();
+        auto si = std::to_string(error);
+        showMessageBox(si.c_str(), "ss");
+        //report error
+    }
     */
+    SendMessage(hWnd, STM_SETIMAGE, (WPARAM)IMAGE_BITMAP, (LPARAM)hBitmap);
+    InvalidateRect(hWnd, NULL, FALSE);
 }
 
 //open the browser and load SAP iw29 or iw65 screen for the given start and finish KMs and the Basecode
@@ -891,7 +898,7 @@ int WINAPI showDefectWindow()
 }
 
 //show the track selection window as we want it to be
-void resizeTrackSelectionWindow()
+void resizeTrackSelectionWindow(bool notshowBtn = true)
 {
     HWND trackSelectionWindow = FindWindow("ThunderRT6FormDC", "Select Track Section");
     if (trackSelectionWindow) {
@@ -925,11 +932,15 @@ void resizeTrackSelectionWindow()
         ShowWindow(checkBox, 0);
         ShowWindow(backBtn, 0);
         ShowWindow(browseBtn, 0);
+        if (notshowBtn)
+        {
+            ShowWindow(selectBtn, 0);
+        }
 
         // resize controls
         SetWindowPos(tabs, 0, 680, 10, width, height, SWP_SHOWWINDOW);
         SetWindowPos(flexGrid, 0, 0, 0, width, height, SWP_SHOWWINDOW);
-        SetWindowPos(selectBtn, 0, 4, 323, 657, 33, SWP_SHOWWINDOW);
+        //SetWindowPos(selectBtn, 0, 4, 323, 657, 33, SWP_SHOWWINDOW);
 
         //reload the image everytime
         if (FindWindowExA(trackSelectionWindow, NULL, "STATIC", NULL)) {
@@ -958,18 +969,11 @@ void resizeTrackSelectionWindow()
                 trackSelectionWindow, NULL, NULL, NULL);
             HWND staticControl = CreateWindowEx(WS_EX_DLGMODALFRAME, "STATIC", NULL,
                 WS_VISIBLE | WS_CHILD | SS_BITMAP,
-                73, 476, 504, 438,
+                73, 476, 504, 412,
                 trackSelectionWindow, NULL, NULL, NULL);
             //load the image 
             LoadScreen(staticControl);
         }
-
-
-        /*
-        SetWindowPos(cancelBtn, 0, 4, 575, 657, 683, SWP_SHOWWINDOW);
-        SendMessage(cancelBtn, WM_SETTEXT, 0, (LPARAM)"Singh Moded\n\n2022");
-        EnableWindow(cancelBtn, 0);
-        */
 
         //update display
         UpdateWindow(trackSelectionWindow);
@@ -1168,10 +1172,38 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
     //message param
     PMSG pMsg = (PMSG)lParam;
 
+    //freopen("output.txt", "a", stdout);
+    //cout << (PMSG)wParam << endl;
+
     //someone double click?
     if (pMsg->message == WM_LBUTTONDBLCLK)
     {
-        controlProperties();
+        //local declarations
+        char szClassName[128];
+        memset(szClassName, 0, sizeof(szClassName));
+
+        //get class of item the user clicked on
+        ::GetClassName(pMsg->hwnd, szClassName, sizeof(szClassName) - 1);
+
+        //check if it is msflexgrid control
+        if (IsWindow(pMsg->hwnd) && (strcmp(szClassName, "MSFlexGridWndClass") == 0)) {
+            HWND trackSelectionWindow = FindWindow("ThunderRT6FormDC", "Select Track Section");
+            if (trackSelectionWindow) {
+                //get select button
+                HWND selectBtn = FindWindowExA(trackSelectionWindow, NULL, "ThunderRT6CommandButton", "&Select");
+                //move and show button
+                if (selectBtn) {
+                    SetWindowPos(selectBtn, 0, 4, 323, 657, 33, SWP_SHOWWINDOW);
+                }
+            }
+        }
+        else 
+        {
+            //check if the user double clicked on the defect ID in EAM defect window
+            //or if they want to enable disabled text editing in POI window
+            controlProperties();
+        }
+
         return CallNextHookEx(NULL, nCode, wParam, lParam);
     }
 
@@ -1181,7 +1213,7 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
         //check if select track window open
         HWND targetWnd = FindWindow("ThunderRT6FormDC", "Select Track Section");
         if (targetWnd && IsWindowVisible(targetWnd)) {
-            resizeTrackSelectionWindow();
+            //resizeTrackSelectionWindow();
             //local declarations
             char szClassName[128];
             memset(szClassName, 0, sizeof(szClassName));
@@ -1326,6 +1358,7 @@ LRESULT CALLBACK NuWndProc(int nCode, WPARAM wParam, LPARAM lParam) {
 }
 */
 
+
 //custom CBTProc
 LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
@@ -1333,7 +1366,11 @@ LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
     {
         return CallNextHookEx(NULL, nCode, wParam, lParam);
     }
-    
+        
+    //freopen("output.txt", "a", stdout);
+    //cout << "x: " << x << " y: " << y << endl;
+
+
     //when we the track selection window is ready 
     //the cancel button is the last to be created 
     //so check for it and its parent must be "select track section" window
@@ -1358,7 +1395,7 @@ LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam)
         //it has to be done again otherwise the "select" button is not
         //positioned correctly
         if (windowResized) {
-            resizeTrackSelectionWindow();
+            resizeTrackSelectionWindow(false);
         }
         return CallNextHookEx(NULL, nCode, wParam, lParam);
     }
