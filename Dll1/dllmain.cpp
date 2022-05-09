@@ -1149,7 +1149,10 @@ void getProcessedTracks(HWND targetWnd, int sort = 0) {
 
         //open the folder containing the xls/csv file
         //and select/highlight the file named Get_Processed_Tracks
-        BrowseToFile("C:\\Users\\Public\\Documents\\", "C:\\Users\\Public\\Documents\\Get_Processed_Tracks.xlsm");
+        //BrowseToFile("C:\\Users\\Public\\Documents\\", "C:\\Users\\Public\\Documents\\Get_Processed_Tracks.xlsm");
+        
+        //INSTEAD OF OPENING THE FOLDER ABOVE we will start the excel file
+        ShellExecute(NULL, NULL, "C:\\Users\\Public\\Documents\\Get_Processed_Tracks.xlsm", NULL, "C:\\Users\\Public\\Documents", SW_SHOWDEFAULT);
     }
 }
 /* --------------------------------------------------------------------------- 
@@ -1236,9 +1239,8 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
                     getProcessedTracks(targetWnd, 1);
                 }
                 if (strcmp(szText, "Check Processed Tracks in Excel") == 0) {
-                    ShellExecute(NULL, NULL, "C:\\Users\\Public\\Documents\\Get_Processed_Tracks.xlsm", NULL, "C:\\Users\\Public\\Documents", SW_SHOWDEFAULT);
                     //export track list to csv and open excel file
-                    //getProcessedTracks(targetWnd);
+                    getProcessedTracks(targetWnd);
                 }                
                 if (strcmp(szText, "Sort by Track Name") == 0) {
                     //sort by track name
