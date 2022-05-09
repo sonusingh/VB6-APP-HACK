@@ -100,7 +100,7 @@ END
 // Bitmap
 //
 
-IDB_BITMAP1             BITMAP                  "fatherson.bmp"
+IDB_BITMAP1             BITMAP                  "logo.bmp"
 
 #endif    // English (United States) resources
 /////////////////////////////////////////////////////////////////////////////
