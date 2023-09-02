@@ -348,7 +348,6 @@ void getProcessedTracks(HWND targetWnd, int sort = 0) {
     //child of main window
     HWND tabs = FindWindowExA(targetWnd, NULL, "SSTabCtlWndClass", NULL);
     //child of control
-    //HWND flexGridHWND = FindWindowExA(tabs, NULL, "MSFlexGridWndClass", NULL);
     HWND flexGridHWND = FindWindowExA(targetWnd, NULL, "MSFlexGridWndClass", NULL);
 
     //if the flexgrid is not found - exit
