@@ -1,11 +1,7 @@
 /*
 
 NOTE THIS MUST BE COMPILED AS WIN32 (NOT x64) for the dll to be injected
-As the DLL is also win32 because AIMS is win32
-
-for MingW32 use:
-
-C:\Users\ssingh1\Downloads\MinGW\mingw32\bin\i686-w64-mingw32-g++ -m32 -o C:\Users\ssingh1\Downloads\MinGW\code\test.exe C:\Users\ssingh1\Downloads\MinGW\code\app.cpp -s -static-libgcc -static-libstdc++
+As the DLL is also win32 because VB APPS are win32
 
 */
 #define _WIN32_WINNT 0x0501
@@ -21,42 +17,57 @@ using namespace std;
 
 /* GLOBAL DECLARATIONS */
 
-//AIMS processID
-unsigned long AIMSprocessID = 0;
+//store process ID of running VB APP
+unsigned long vbAppId = 0;
+LPCSTR szDllName = "extractor.dll";
 
-// depending on arguments supplied
-// we declare the vars and set the correct data in vars
-// in the main()
-LPCSTR szClass = "ThunderRT6FormDC"; //is the same for both KME and AIMS
-LPCSTR szCaption = "Form1"; //this is what changes depending on user supplied args
-LPCSTR szDllName = "extractor.dll"; //default to this
-
-// get the id of process from window handle
-unsigned long GetTargetThreadIdFromWindow(const char* className, const char* windowName)
+//enumerate desktop windows
+BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam)
 {
-	HWND targetWnd;
-	unsigned long processID = 0;
+	char class_name[256];
+	GetClassName(hwnd, class_name, sizeof(class_name));
 
-	targetWnd = FindWindow(className, windowName);
-	return GetWindowThreadProcessId(targetWnd, &processID);
+	if (strcmp(class_name, "ThunderRT6FormDC") == 0)
+	{
+		// Found a window with the specified class name
+		DWORD process_id;
+		vbAppId = GetWindowThreadProcessId(hwnd, &process_id);
+
+		// You can perform actions on the window here
+		// For example, bring it to the foreground
+		SetForegroundWindow(hwnd);
+
+		// To stop enumerating windows, return FALSE
+		return FALSE;
+	}
+
+	// Continue enumerating windows
+	return TRUE;
 }
-
 
 // main function
 // we will check for startup commanline args passed
 int main(int argc, char* argv[]) {
-
 	//get a handle of the console window for changing output text color
 	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
-	// injection of DLL starts here
-	unsigned long threadID = GetTargetThreadIdFromWindow(szClass, szCaption); // supply the class and window title
-	//unsigned long threadID = 0;
+	// Enumerate all top-level windows
+	if (EnumWindows(EnumWindowsProc, 0))
+	{
+		//set output color to green
+		SetConsoleTextAttribute(hConsole, FOREGROUND_RED);
+		std::cout << "No windows with class name 'ThunderRT6FormDC' were found, i.e. no VB apps running!\n\n" << std::endl;
+		// Prompt the user to press Enter key to exit
+		std::cout << "Press Enter key to exit...";
+		std::cin.get(); // Wait for the user to press Enter
+
+		return 0;
+	}
 
 	//set output color to green
 	SetConsoleTextAttribute(hConsole, 10);
 	//print KME/AIMS app id
-	printf("VB6 App Process ID: %i\n", threadID);
+	printf("VB6 App Process ID: %i\n", vbAppId);
 
 	// get id of this app and pass it to the dll
 	unsigned long currentAppID = GetCurrentProcessId();
@@ -74,7 +85,7 @@ int main(int argc, char* argv[]) {
 		Install install = (Install)GetProcAddress(hinst, "install");
 		Uninstall uninstall = (Uninstall)GetProcAddress(hinst, "uninstall");
 
-		install(threadID, currentAppID);
+		install(vbAppId, currentAppID);
 
 		MSG msg = {};
 
