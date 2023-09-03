@@ -58,6 +58,37 @@ void showMessageBox(LPCSTR msg, LPCSTR title)
     MessageBox(HWND_DESKTOP, msg, title, MB_OK);
 }
 
+// returns the text value of HWND (WINDOW HANDLE)
+std::string HWNDToString(HWND input)
+{
+    std::string output = "";
+    size_t sizeTBuffer = GetWindowTextLength(input) + 1;
+
+    if (sizeTBuffer > 0)
+    {
+        output.resize(sizeTBuffer);
+        sizeTBuffer = GetWindowText(input, &output[0], sizeTBuffer);
+        output.resize(sizeTBuffer);
+    }
+
+    return output;
+}
+
+//get real parent window of control
+HWND GetRealParent(HWND hWnd)
+{
+    HWND hWndOwner;
+
+    // To obtain a window's owner window, instead of using GetParent,
+    // use GetWindow with the GW_OWNER flag.
+
+    if (NULL != (hWndOwner = GetWindow(hWnd, GW_OWNER)))
+        return hWndOwner;
+
+    // Obtain the parent window and not the owner
+    return GetAncestor(hWnd, GA_PARENT);
+}
+
 // Callback function to enumerate child windows
 BOOL CALLBACK EnumChildWindowsProc(HWND hwndChild, LPARAM lParam)
 {
@@ -76,7 +107,9 @@ BOOL CALLBACK EnumChildWindowsProc(HWND hwndChild, LPARAM lParam)
 
             // In this example, we'll print the HWND of the control
             showMessageBox("Found MSFlexGrid control: HWND = 0x%p\n","Found FlexGridClass");
-
+            // Use the GetRealParent function to get the "real" parent
+            HWND realParent = GetRealParent(hwndChild);
+            showMessageBox(HWNDToString(realParent).c_str(), "Parent of control");
             // To stop enumerating child windows, return FALSE
             return FALSE;
         }
@@ -86,21 +119,6 @@ BOOL CALLBACK EnumChildWindowsProc(HWND hwndChild, LPARAM lParam)
     return TRUE;
 }
 
-// returns the text value of HWND (WINDOW HANDLE)
-std::string HWNDToString(HWND input)
-{
-    std::string output = "";
-    size_t sizeTBuffer = GetWindowTextLength(input) + 1;
-
-    if (sizeTBuffer > 0)
-    {
-        output.resize(sizeTBuffer);
-        sizeTBuffer = GetWindowText(input, &output[0], sizeTBuffer);
-        output.resize(sizeTBuffer);
-    }
-
-    return output;
-}
 
 //write output to text file
 void WriteToFile(std::string text, HDC hDC = nullptr)
@@ -117,23 +135,6 @@ void WriteToFile(std::string text, HDC hDC = nullptr)
 std::string convertToStr(LPCSTR str) {
     return std::string(str);
 }
-
-
-//get real parent window of control
-HWND GetRealParent(HWND hWnd)
-{
-    HWND hWndOwner;
-
-    // To obtain a window's owner window, instead of using GetParent,
-    // use GetWindow with the GW_OWNER flag.
-
-    if (NULL != (hWndOwner = GetWindow(hWnd, GW_OWNER)))
-        return hWndOwner;
-
-    // Obtain the parent window and not the owner
-    return GetAncestor(hWnd, GA_PARENT);
-}
-
 
 
 /*
@@ -174,36 +175,6 @@ int WINAPI Mine_DrawTextEx(__in HDC hdc,__inout LPTSTR lpchText,__in int cchText
 BOOL WINAPI Mine_ExtTextOut(__in HDC hdc,__in int X,__in int Y,__in UINT fuOptions,__in const RECT* lprc,__in LPCTSTR lpString,__in UINT cbCount,__in const INT* lpDx)
 {
     return Real_ExtTextOut(hdc, X, Y, fuOptions, lprc, lpString, cbCount, lpDx);
-}
-
-//store the our injector app's process ID in text file for later access
-void storeInjAppID(unsigned long processID) {
-    //output to text file
-    std::ofstream outfile;
-    outfile.open("pid.txt", std::fstream::trunc); // truncate file (ie clear contents)
-    outfile << processID;
-    outfile.close();
-
-}
-
-//retrieve injector app's id from text file
-unsigned long getID() {
-    int sum = 0;
-    int x;
-    std::ifstream inFile;
-
-    inFile.open("pid.txt");
-    if (!inFile) {
-        showMessageBox("Unable to open C:\\Users\\Public\\Documents\\pid.txt", "Unable to open PID file");
-    }
-    else {
-        while (inFile >> x) {
-            sum = sum + x;
-        }
-        inFile.close();
-    }
-
-    return sum;
 }
 
 
