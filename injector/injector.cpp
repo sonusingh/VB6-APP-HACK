@@ -19,6 +19,7 @@ using namespace std;
 
 //store process ID of running VB APP
 unsigned long vbAppId = 0;
+HWND vbAPPHwnd;
 LPCSTR szDllName = "extractor.dll";
 
 //enumerate desktop windows
@@ -31,7 +32,10 @@ BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam)
 	{
 		// Found a window with the specified class name
 		DWORD process_id;
+		// get/store process ID of found VB APP
 		vbAppId = GetWindowThreadProcessId(hwnd, &process_id);
+		//store handle to hwnd
+		vbAPPHwnd = hwnd;
 
 		// You can perform actions on the window here
 		// For example, bring it to the foreground
@@ -79,13 +83,13 @@ int main(int argc, char* argv[]) {
 	HINSTANCE hinst = LoadLibrary(szDllName);
 
 	if (hinst) {
-		typedef void (*Install)(unsigned long, unsigned long);
+		typedef void (*Install)(unsigned long);
 		typedef void (*Uninstall)();
 
 		Install install = (Install)GetProcAddress(hinst, "install");
 		Uninstall uninstall = (Uninstall)GetProcAddress(hinst, "uninstall");
 
-		install(vbAppId, currentAppID);
+		install(vbAppId);
 
 		MSG msg = {};
 

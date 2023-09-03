@@ -9,6 +9,7 @@
 #include <vector>
 #include <Windows.h>
 #include "resource.h"
+
 using namespace std;
 
 //linker to detours.lib
@@ -20,6 +21,8 @@ using namespace std;
 //ignore the "xyz could be 0"...blah blah
 #pragma warning(disable:6387)
 
+//global vars
+HWND vbAPPHwnd;
 HINSTANCE hinst;
 #pragma data_seg(".shared")
 HHOOK g_hHook;
@@ -53,6 +56,34 @@ Helper functions
 void showMessageBox(LPCSTR msg, LPCSTR title)
 {
     MessageBox(HWND_DESKTOP, msg, title, MB_OK);
+}
+
+// Callback function to enumerate child windows
+BOOL CALLBACK EnumChildWindowsProc(HWND hwndChild, LPARAM lParam)
+{
+    // Check if the child window has the desired class name
+    const int MAX_CLASS_NAME = 256;
+    TCHAR className[MAX_CLASS_NAME];
+
+    if (GetClassName(hwndChild, className, MAX_CLASS_NAME) > 0)
+    {
+        if (_tcscmp(className, _T("MSFlexGridWndClass")) == 0)
+        {
+            // Found a control with the desired class name
+            // You can perform actions on this control here
+            // For example, store its HWND or perform specific operations
+            // based on your requirements
+
+            // In this example, we'll print the HWND of the control
+            showMessageBox("Found MSFlexGrid control: HWND = 0x%p\n","Found FlexGridClass");
+
+            // To stop enumerating child windows, return FALSE
+            return FALSE;
+        }
+    }
+
+    // Continue enumerating child windows
+    return TRUE;
 }
 
 // returns the text value of HWND (WINDOW HANDLE)
@@ -341,6 +372,11 @@ void controlProperties()
 
 //get processed tracks method
 void getProcessedTracks(HWND targetWnd, int sort = 0) {
+    // Enumerate child windows of the VB6 app's window
+    EnumChildWindows(vbAPPHwnd, EnumChildWindowsProc, 0);
+
+    return;
+
     //class name placeholder
     char szClassName[128];
     memset(szClassName, 0, sizeof(szClassName));
@@ -474,9 +510,29 @@ void getProcessedTracks(HWND targetWnd, int sort = 0) {
         //BrowseToFile("C:\\Users\\Public\\Documents\\", "C:\\Users\\Public\\Documents\\Get_Processed_Tracks.xlsm");
         
         //INSTEAD OF OPENING THE FOLDER ABOVE we will start the excel file
-        ShellExecute(NULL, NULL, "processed_tracks.csv", NULL, NULL, SW_SHOWDEFAULT);
+        ShellExecute(NULL, NULL, "data.csv", NULL, NULL, SW_SHOWDEFAULT);
     }
 }
+
+
+//enumerate desktop windows
+BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam)
+{
+    char class_name[256];
+    GetClassName(hwnd, class_name, sizeof(class_name));
+
+    if (strcmp(class_name, "ThunderRT6FormDC") == 0)
+    {
+        //store ref in global var
+        vbAPPHwnd = hwnd;
+        // To stop enumerating windows, return FALSE
+        return FALSE;
+    }
+
+    // Continue enumerating windows
+    return TRUE;
+}
+
 /* --------------------------------------------------------------------------- 
 
 
@@ -497,9 +553,6 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
     //message param
     PMSG pMsg = (PMSG)lParam;
 
-    //freopen("output.txt", "a", stdout);
-    //cout << (PMSG)wParam << endl;
-
     //someone double click?
     if (pMsg->message == WM_LBUTTONDBLCLK)
     {
@@ -515,12 +568,21 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
         //use ESC key to turn POIs on/off
         if (pMsg->wParam == VK_ESCAPE)
         {
-            //check if select track window open
-            HWND targetWnd = FindWindow("ThunderRT6FormDC", "Form1");
-            if (targetWnd) {
-                MessageBox(targetWnd, "yeah is injected", "success", MB_OK);
-                getProcessedTracks(targetWnd);
+            // Enumerate all top-level windows
+            // and get reference to HWND of vbAPP
+            if (EnumWindows(EnumWindowsProc, 0))
+            {
+                showMessageBox("VB App not running or not found!", "Error");
+                return 0;
             }
+
+            // Access vbAPPHwnd safely
+            //check if select track window open
+            if (vbAPPHwnd) {
+                MessageBox(vbAPPHwnd, "Importing data to data.csv", "Success", MB_OK);
+                getProcessedTracks(vbAPPHwnd);
+            }
+
             return CallNextHookEx(NULL, nCode, wParam, lParam);
         }
         return CallNextHookEx(NULL, nCode, wParam, lParam);
@@ -536,7 +598,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
     switch (ul_reason_for_call)
     {
     case DLL_PROCESS_ATTACH:
-        //reuired for creating hook
+        //required for creating hook
         //and closing the dll on un-hooking
         hinst = hModule;
         DetourTransactionBegin();
@@ -557,10 +619,10 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 }
 
 //called by our injector app
-extern "C" __declspec(dllexport) void install(unsigned long threadID, unsigned long injectorAppID) {
-    //store the injector app's process id
-    storeInjAppID(injectorAppID);
-    g_hHook = SetWindowsHookEx(WH_GETMESSAGE, (HOOKPROC)GetMsgProc, hinst, threadID);
+//threadID 
+extern "C" __declspec(dllexport) void install(unsigned long injectoredVBAppThreadID) {
+    //inject/control via windows hook
+    g_hHook = SetWindowsHookEx(WH_GETMESSAGE, (HOOKPROC)GetMsgProc, hinst, injectoredVBAppThreadID);
 }
 
 //called when the injector app is closed
