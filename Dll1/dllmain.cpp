@@ -22,7 +22,8 @@ using namespace std;
 #pragma warning(disable:6387)
 
 //global vars
-HWND vbAPPHwnd;
+HWND vbAPPHwnd = NULL; //global var to store hwnd for VB6 app
+HWND msFlexGrdClass = NULL; // Global variable to store HWND for MSFlexGridWndClass
 HINSTANCE hinst;
 #pragma data_seg(".shared")
 HHOOK g_hHook;
@@ -104,12 +105,9 @@ BOOL CALLBACK EnumChildWindowsProc(HWND hwndChild, LPARAM lParam)
             // You can perform actions on this control here
             // For example, store its HWND or perform specific operations
             // based on your requirements
-
+            msFlexGrdClass = hwndChild;
             // In this example, we'll print the HWND of the control
-            showMessageBox("Found MSFlexGrid control: HWND = 0x%p\n","Found FlexGridClass");
-            // Use the GetRealParent function to get the "real" parent
-            HWND realParent = GetRealParent(hwndChild);
-            showMessageBox(HWNDToString(realParent).c_str(), "Parent of control");
+            //showMessageBox("Found MSFlexGrid control","Found FlexGridClass");
             // To stop enumerating child windows, return FALSE
             return FALSE;
         }
@@ -346,28 +344,28 @@ void getProcessedTracks(HWND targetWnd, int sort = 0) {
     // Enumerate child windows of the VB6 app's window
     EnumChildWindows(vbAPPHwnd, EnumChildWindowsProc, 0);
 
-    return;
+    //return;
 
     //class name placeholder
     char szClassName[128];
     memset(szClassName, 0, sizeof(szClassName));
 
     //child of main window
-    HWND tabs = FindWindowExA(targetWnd, NULL, "SSTabCtlWndClass", NULL);
+    //HWND tabs = FindWindowExA(targetWnd, NULL, "SSTabCtlWndClass", NULL);
     //child of control
-    HWND flexGridHWND = FindWindowExA(targetWnd, NULL, "MSFlexGridWndClass", NULL);
+    //HWND flexGridHWND = FindWindowExA(targetWnd, NULL, "MSFlexGridWndClass", NULL);
 
     //if the flexgrid is not found - exit
-    if (!flexGridHWND) {
+    if (!msFlexGrdClass) {
         MessageBox(targetWnd, "MSFlexGridWndClass Not Found!", "Error", MB_OK);
         return;
     }
 
     //check we have the track selection grid in focus
-    ::GetClassName(flexGridHWND, szClassName, sizeof(szClassName) - 1);
+    ::GetClassName(msFlexGrdClass, szClassName, sizeof(szClassName) - 1);
     if (strcmp(szClassName, "MSFlexGridWndClass") == 0)
     {
-        DWORD* p = (DWORD*) ::GetWindowLong(flexGridHWND, GWL_USERDATA);
+        DWORD* p = (DWORD*) ::GetWindowLong(msFlexGrdClass, GWL_USERDATA);
         p++; //add 8;
         p++; //add 8;
         LPDISPATCH pDisp = (LPDISPATCH)*p;
@@ -428,7 +426,7 @@ void getProcessedTracks(HWND targetWnd, int sort = 0) {
 
         //output to csv file
         std::ofstream outfile;
-        outfile.open("processed_tracks.csv", std::fstream::trunc); // truncate file (ie clear contents)
+        outfile.open("data.csv", std::fstream::trunc); // truncate file (ie clear contents)
         //MessageBox(NULL, appData, "Output File", MB_OK);
         //outfile << text << "\n";
 
