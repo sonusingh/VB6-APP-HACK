@@ -1,18 +1,13 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #include "pch.h"
 #include "detours.h"
-#include <tchar.h>
-#include <atlstr.h>
 #include <atlwin.h>
-#include <string>
 #include <fstream>
 #include <vector>
-#include <Windows.h>
-#include "resource.h"
 
 using namespace std;
 
-//linker to detours.lib
+//link to detours.lib
 #pragma comment(lib, "detours.lib")
 
 //need to use this otherwise we get the following error:
@@ -59,38 +54,8 @@ void showMessageBox(LPCSTR msg, LPCSTR title)
     MessageBox(HWND_DESKTOP, msg, title, MB_OK);
 }
 
-// returns the text value of HWND (WINDOW HANDLE)
-std::string HWNDToString(HWND input)
-{
-    std::string output = "";
-    size_t sizeTBuffer = GetWindowTextLength(input) + 1;
-
-    if (sizeTBuffer > 0)
-    {
-        output.resize(sizeTBuffer);
-        sizeTBuffer = GetWindowText(input, &output[0], sizeTBuffer);
-        output.resize(sizeTBuffer);
-    }
-
-    return output;
-}
-
-//get real parent window of control
-HWND GetRealParent(HWND hWnd)
-{
-    HWND hWndOwner;
-
-    // To obtain a window's owner window, instead of using GetParent,
-    // use GetWindow with the GW_OWNER flag.
-
-    if (NULL != (hWndOwner = GetWindow(hWnd, GW_OWNER)))
-        return hWndOwner;
-
-    // Obtain the parent window and not the owner
-    return GetAncestor(hWnd, GA_PARENT);
-}
-
 // Callback function to enumerate child windows
+// try to find msflexgrid control inside the given vb app
 BOOL CALLBACK EnumChildWindowsProc(HWND hwndChild, LPARAM lParam)
 {
     // Check if the child window has the desired class name
@@ -117,7 +82,6 @@ BOOL CALLBACK EnumChildWindowsProc(HWND hwndChild, LPARAM lParam)
     return TRUE;
 }
 
-
 //write output to text file
 void WriteToFile(std::string text, HDC hDC = nullptr)
 {
@@ -133,7 +97,6 @@ void WriteToFile(std::string text, HDC hDC = nullptr)
 std::string convertToStr(LPCSTR str) {
     return std::string(str);
 }
-
 
 /*
 
@@ -339,29 +302,23 @@ void controlProperties()
     return;
 }
 
-//get processed tracks method
-void getProcessedTracks(HWND targetWnd, int sort = 0) {
+//this is the method that will try to find msflexgrid control
+//and extract the data from it
+void extractMSFlexGridData(HWND targetWnd, int sort = 0) {
     // Enumerate child windows of the VB6 app's window
     EnumChildWindows(vbAPPHwnd, EnumChildWindowsProc, 0);
-
-    //return;
 
     //class name placeholder
     char szClassName[128];
     memset(szClassName, 0, sizeof(szClassName));
 
-    //child of main window
-    //HWND tabs = FindWindowExA(targetWnd, NULL, "SSTabCtlWndClass", NULL);
-    //child of control
-    //HWND flexGridHWND = FindWindowExA(targetWnd, NULL, "MSFlexGridWndClass", NULL);
-
-    //if the flexgrid is not found - exit
+    //if the msflexgrid is not found - exit
     if (!msFlexGrdClass) {
         MessageBox(targetWnd, "MSFlexGridWndClass Not Found!", "Error", MB_OK);
         return;
     }
 
-    //check we have the track selection grid in focus
+    //check we have msflexgrid control
     ::GetClassName(msFlexGrdClass, szClassName, sizeof(szClassName) - 1);
     if (strcmp(szClassName, "MSFlexGridWndClass") == 0)
     {
@@ -385,7 +342,7 @@ void getProcessedTracks(HWND targetWnd, int sort = 0) {
         // getcols() 
         iDriver.InvokeHelper(0x5, DISPATCH_PROPERTYGET, VT_I4, (void*)&col, NULL);
         
-        //this is called when the track selection window is displayed upon loading up
+        //if you just want to sort the data in the grid and not extract it
         if (sort > 0) {
             static BYTE parmss[] = VTS_I4;
             //setCol() select the column we want to sort
@@ -427,8 +384,6 @@ void getProcessedTracks(HWND targetWnd, int sort = 0) {
         //output to csv file
         std::ofstream outfile;
         outfile.open("data.csv", std::fstream::trunc); // truncate file (ie clear contents)
-        //MessageBox(NULL, appData, "Output File", MB_OK);
-        //outfile << text << "\n";
 
         //loop through the rows
         for (int i = 0; i < row; i++) {
@@ -439,12 +394,11 @@ void getProcessedTracks(HWND targetWnd, int sort = 0) {
             else {
                 outfile << "\n";
             }
-            //loop throught he columns
+            //loop throught the columns
             for (int j = 0; j < col; j++)
             {
                 iDriver.InvokeHelper(0x37, DISPATCH_PROPERTYGET, VT_BSTR, (void*)&result, parms, col * i + j);
                 outfile << result << "\t";
-                //showMessageBox(result, "Data");
             }
         }
 
@@ -460,31 +414,16 @@ void getProcessedTracks(HWND targetWnd, int sort = 0) {
         //close the csv file
         outfile.close();
 
-        /*
-        //USE THIS CODE TO CLOSE THE injecting APP
-        //test what is being saved in PID.txt file
-        //auto ss = std::to_string(getID());
-        //MessageBox(pMsg->hwnd, ss.c_str(), "Process ID", MB_OK);
+        //display success message
+        showMessageBox("Data extracted from MSFLexGrid control and saved to file!", "Success");
 
-        // exit the injector app
-        // see https://stackoverflow.com/a/1916668
-        const auto inj_app = OpenProcess(PROCESS_TERMINATE, false, getID());
-        TerminateProcess(inj_app, 1);
-        CloseHandle(inj_app);
-
-        */
-
-        //open the folder containing the xls/csv file
-        //and select/highlight the file named Get_Processed_Tracks
-        //BrowseToFile("C:\\Users\\Public\\Documents\\", "C:\\Users\\Public\\Documents\\Get_Processed_Tracks.xlsm");
-        
         //INSTEAD OF OPENING THE FOLDER ABOVE we will start the excel file
         ShellExecute(NULL, NULL, "data.csv", NULL, NULL, SW_SHOWDEFAULT);
     }
 }
 
-
 //enumerate desktop windows
+//and try to find a VB6 APP
 BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam)
 {
     char class_name[256];
@@ -545,11 +484,9 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
                 return 0;
             }
 
-            // Access vbAPPHwnd safely
-            //check if select track window open
+            //Access vbAPPHwnd safely
             if (vbAPPHwnd) {
-                MessageBox(vbAPPHwnd, "Importing data to data.csv", "Success", MB_OK);
-                getProcessedTracks(vbAPPHwnd);
+                extractMSFlexGridData(vbAPPHwnd);
             }
 
             return CallNextHookEx(NULL, nCode, wParam, lParam);
@@ -558,8 +495,6 @@ LRESULT CALLBACK GetMsgProc(int nCode, WPARAM wParam, LPARAM lParam)
     }
     return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
-
-
 
 // Install the DrawText detour whenever this DLL is loaded into any process...
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)

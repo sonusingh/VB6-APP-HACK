@@ -1,15 +1,11 @@
 /*
 
 NOTE THIS MUST BE COMPILED AS WIN32 (NOT x64) for the dll to be injected
-As the DLL is also win32 because VB APPS are win32
+As the DLL must be win32 because VB APPS are win32
 
 */
-#define _WIN32_WINNT 0x0501
-#include <Windows.h>
-#include <stdio.h>
 #include <iostream>
 #include <shlobj.h>
-#include <tlhelp32.h>
 #include <tchar.h>
 
 // required for cout and endl
